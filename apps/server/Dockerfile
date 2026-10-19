@@ -11,7 +11,7 @@ RUN DATABASE_URL=postgresql://build@localhost/build npm run build -w apps/server
 
 # Separate pruned copy so the runtime image carries no dev tools (prisma CLI stays in `build`, used for migrations).
 FROM build AS prod
-RUN npm prune --omit=dev && rm -rf apps/server/src apps/server/test
+RUN npm prune --omit=dev --ignore-scripts && rm -rf apps/server/src apps/server/test
 
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 MEDIA_DIR=/data/media
