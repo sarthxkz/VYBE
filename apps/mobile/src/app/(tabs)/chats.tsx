@@ -53,7 +53,7 @@ export default function ChatsScreen() {
             <ListItem
               title={name}
               subtitle={preview(item)}
-              left={<Avatar mediaId={f?.avatarMediaId} name={name} />}
+              left={<Avatar mediaId={f?.avatarMediaId} look={f?.avatarStyle} name={name} />}
               onPress={() => router.push(`/chat/${item.peerId}`)}
               right={
                 <View style={{ alignItems: 'flex-end', gap: space.xs }}>

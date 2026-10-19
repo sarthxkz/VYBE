@@ -25,7 +25,7 @@ export default function UserProfile() {
   return (
     <Screen scroll>
       <View style={{ alignItems: 'center', gap: space.sm, marginTop: space.xxl }}>
-        <Avatar mediaId={u.avatarMediaId} name={name} size={120} />
+        <Avatar mediaId={u.avatarMediaId} look={u.avatarStyle} name={name} size={120} />
         <Text variant="title">{name}</Text>
         <Text muted>@{u.username}</Text>
         {u.bio ? <Text style={{ textAlign: 'center' }}>{u.bio}</Text> : null}

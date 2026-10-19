@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Join me on Vybe</title>
+<style>
+  :root { --grape: #6C4CF5; --deep: #4B2FD1; --coral: #FF6B4A; --lime: #C6F432; --ink: #14121F; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #fff;
+         background: linear-gradient(135deg, var(--grape), var(--deep)); }
+  main { width: 100%; max-width: 380px; text-align: center; }
+  svg { width: 120px; height: 120px; }
+  h1 { font-size: 30px; line-height: 1.15; margin: 16px 0 8px; letter-spacing: -0.5px; }
+  p { margin: 0 0 24px; opacity: .9; }
+  a.btn { display: block; padding: 14px 18px; border-radius: 999px; font-weight: 700; text-decoration: none; margin-bottom: 12px; }
+  .primary { background: var(--lime); color: var(--ink); }
+  .ghost { background: rgba(255,255,255,.14); color: #fff; }
+  small { display: block; opacity: .75; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <svg viewBox="150 180 724 680" aria-label="Vybe">
+    <path d="M318 318 L512 742 L706 318" fill="none" stroke="#fff" stroke-width="124" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="318" cy="318" r="96" fill="#FF6B4A" stroke="#fff" stroke-width="28"/>
+    <circle cx="706" cy="318" r="96" fill="#C6F432" stroke="#fff" stroke-width="28"/>
+  </svg>
+  <h1 id="title">You’re invited to Vybe</h1>
+  <p>A private map for your friends: see who’s around, share your vibe, chat end-to-end encrypted.</p>
+  <a class="btn primary" id="get" href="/app/android/latest.json">Get Vybe for Android</a>
+  <a class="btn ghost" id="open" href="vybe://friends/add">I have Vybe: open it</a>
+  <small>Install the app, then open this link again to add your friend.</small>
+</main>
+<script>
+  // Username only ever goes in via textContent / an encoded URL; anything else is ignored.
+  var u = (new URLSearchParams(location.search).get('u') || '').toLowerCase();
+  if (/^[a-z0-9_.]{3,20}$/.test(u)) {
+    document.getElementById('title').textContent = '@' + u + ' invited you to Vybe';
+    document.getElementById('open').href = 'vybe://invite/' + encodeURIComponent(u);
+  }
+  fetch('/app/android/latest.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && typeof d.url === 'string' && d.url.indexOf(location.origin + '/app/android/') === 0) document.getElementById('get').href = d.url;
+  }).catch(function () {});
+</script>
+</body>
+</html>

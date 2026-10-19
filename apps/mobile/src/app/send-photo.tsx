@@ -67,7 +67,7 @@ export default function SendPhoto() {
           <ListItem
             title={item.displayName ?? item.username ?? ''}
             subtitle={`@${item.username}`}
-            left={<Avatar mediaId={item.avatarMediaId} name={item.displayName ?? item.username} size={40} />}
+            left={<Avatar mediaId={item.avatarMediaId} look={item.avatarStyle} name={item.displayName ?? item.username} size={40} />}
             onPress={() => toggle(item.id)}
             right={<Switch value={selected.has(item.id)} onValueChange={() => toggle(item.id)} accessibilityLabel={`Send to ${item.displayName ?? item.username}`} />}
           />

@@ -50,7 +50,7 @@ export default function PhotoViewer() {
       <SafeAreaView edges={['top']} style={{ padding: space.lg }}>
         {photo.data && (
           <Row>
-            <Avatar mediaId={photo.data.sender.avatarMediaId} name={photo.data.sender.displayName ?? photo.data.sender.username} size={36} />
+            <Avatar mediaId={photo.data.sender.avatarMediaId} look={photo.data.sender.avatarStyle} name={photo.data.sender.displayName ?? photo.data.sender.username} size={36} />
             <View style={{ flex: 1 }}>
               <Text variant="bodyStrong" color="#fff">
                 {photo.data.sender.displayName ?? photo.data.sender.username}

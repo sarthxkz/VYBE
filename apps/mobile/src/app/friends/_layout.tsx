@@ -15,6 +15,7 @@ export default function FriendsLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Friends' }} />
       <Stack.Screen name="add" options={{ title: 'Add friends' }} />
+      <Stack.Screen name="invite" options={{ title: 'Invite friends' }} />
     </Stack>
   );
 }

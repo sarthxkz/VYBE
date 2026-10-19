@@ -9,8 +9,8 @@ if (isRelease && (!apiUrl || !apiUrl.startsWith('https://'))) {
 
 // Bump VERSION (and android.versionCode) whenever native code changes: over-the-air updates only reach
 // APKs with the same runtime version, so a JS update can never land on incompatible native code.
-const VERSION = '0.1.0';
-const VERSION_CODE = 1;
+const VERSION = '0.1.1';
+const VERSION_CODE = 2;
 
 const config: ExpoConfig = {
   name: 'Vybe',
@@ -53,6 +53,7 @@ const config: ExpoConfig = {
         locationWhenInUsePermission: 'Vybe shows your location only to friends you choose.',
       },
     ],
+    ['expo-contacts', { contactsPermission: 'Pick friends from your contacts to invite. Contacts stay on your phone.' }],
     ['expo-camera', { cameraPermission: 'Vybe uses the camera so you can snap photos for friends.', recordAudioAndroid: false }],
     ['expo-image-picker', { photosPermission: 'Pick a photo to send privately to friends.', microphonePermission: false }],
     ['expo-notifications', { color: '#6C4CF5' }],

@@ -2,13 +2,29 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { db, ordered, pairKey } from '../../lib/db.js';
 import { requireAuth, uid } from '../../lib/auth.js';
-import { isBlockedEither } from '../../lib/authz.js';
+import { friendIds, isBlockedEither } from '../../lib/authz.js';
 import { badRequest, conflict, notFound, parse } from '../../lib/errors.js';
 import { rl } from '../../lib/rateLimit.js';
 import { deleteMedia } from '../../lib/media.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { emitMany } from '../../realtime.js';
 
-export const publicUserSelect = { id: true, username: true, displayName: true, avatarMediaId: true, bio: true } as const;
+export const publicUserSelect = { id: true, username: true, displayName: true, avatarMediaId: true, avatarStyle: true, bio: true } as const;
+
+// Moods are friends-only and fade after 24 h. Select these alongside publicUserSelect, then run withMood().
+export const moodSelect = { moodEmoji: true, moodText: true, moodSetAt: true } as const;
+export const MOOD_TTL_MS = 24 * 60 * 60 * 1000;
+type MoodCols = { moodEmoji: string | null; moodText: string | null; moodSetAt: Date | null };
+export function withMood<T extends MoodCols>({ moodEmoji, moodText, moodSetAt, ...u }: T) {
+  const live = moodEmoji && moodSetAt && Date.now() - moodSetAt.getTime() < MOOD_TTL_MS;
+  return { ...u, mood: live ? { emoji: moodEmoji, text: moodText, setAt: moodSetAt } : null };
+}
+
+// Each part is an index into the app's part list (apps/mobile/src/ui/character.tsx).
+const part = (max: number) => z.number().int().min(0).max(max);
+export const avatarStyleSchema = z
+  .object({ skin: part(7), face: part(3), hair: part(9), hairColor: part(9), eyes: part(5), mouth: part(5), accessory: part(5), outfit: part(9) })
+  .strict();
 
 export type Relationship = 'self' | 'friends' | 'request_sent' | 'request_received' | 'none';
 
@@ -29,6 +45,7 @@ usersRouter.get('/me', async (req, res) => {
     where: { id: uid(req) },
     select: {
       ...publicUserSelect,
+      ...moodSelect,
       email: true,
       emailVerifiedAt: true,
       showPresence: true,
@@ -39,7 +56,7 @@ usersRouter.get('/me', async (req, res) => {
     },
   });
   const { passwordHash, googleSub, ...rest } = u;
-  res.json({ ...rest, hasPassword: !!passwordHash, hasGoogle: !!googleSub });
+  res.json({ ...withMood(rest), hasPassword: !!passwordHash, hasGoogle: !!googleSub });
 });
 
 const username = z
@@ -57,6 +74,7 @@ usersRouter.patch('/me', async (req, res) => {
         displayName: z.string().trim().min(1).max(40),
         bio: z.string().trim().max(160).nullable(),
         avatarMediaId: z.uuid().nullable(),
+        avatarStyle: avatarStyleSchema.nullable(),
         showPresence: z.boolean(),
       })
       .partial()
@@ -70,7 +88,9 @@ usersRouter.patch('/me', async (req, res) => {
   }
   const old = await db.user.findUniqueOrThrow({ where: { id: me }, select: { avatarMediaId: true } });
   try {
-    const u = await db.user.update({ where: { id: me }, data: body, select: { ...publicUserSelect, showPresence: true } });
+    const { avatarStyle, ...rest } = body;
+    const data = avatarStyle === undefined ? rest : { ...rest, avatarStyle: avatarStyle ?? Prisma.DbNull };
+    const u = await db.user.update({ where: { id: me }, data, select: { ...publicUserSelect, showPresence: true } });
     // Old avatar file is garbage once replaced.
     if (body.avatarMediaId !== undefined && old.avatarMediaId && old.avatarMediaId !== body.avatarMediaId) {
       await deleteMedia([old.avatarMediaId]);
@@ -80,6 +100,32 @@ usersRouter.patch('/me', async (req, res) => {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw conflict('USERNAME_TAKEN');
     throw e;
   }
+});
+
+// One emoji (any skin tone / ZWJ sequence) plus an optional short line.
+const emoji = z
+  .string()
+  .max(16)
+  .regex(/^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\u{200D}|\u{FE0F})+$/u, 'one emoji')
+  .refine((e) => [...new Intl.Segmenter().segment(e)].length === 1, 'one emoji');
+
+usersRouter.put('/me/mood', async (req, res) => {
+  const body = parse(z.object({ emoji, text: z.string().trim().max(40).nullable().optional() }).strict(), req.body);
+  const me = uid(req);
+  const u = await db.user.update({
+    where: { id: me },
+    data: { moodEmoji: body.emoji, moodText: body.text || null, moodSetAt: new Date() },
+    select: moodSelect,
+  });
+  emitMany(await friendIds(me), { type: 'friend:mood', data: { userId: me } });
+  res.json(withMood(u));
+});
+
+usersRouter.delete('/me/mood', async (req, res) => {
+  const me = uid(req);
+  await db.user.update({ where: { id: me }, data: { moodEmoji: null, moodText: null, moodSetAt: null } });
+  emitMany(await friendIds(me), { type: 'friend:mood', data: { userId: me } });
+  res.json({ mood: null });
 });
 
 usersRouter.get('/username-available', async (req, res) => {
@@ -151,7 +197,9 @@ usersRouter.get('/users/:id', async (req, res) => {
   const id = parse(z.uuid(), req.params.id);
   const me = uid(req);
   if (id !== me && (await isBlockedEither(me, id))) throw notFound();
-  const u = await db.user.findUnique({ where: { id, suspendedAt: null }, select: publicUserSelect });
+  const u = await db.user.findUnique({ where: { id, suspendedAt: null }, select: { ...publicUserSelect, ...moodSelect } });
   if (!u) throw notFound();
-  res.json({ ...u, relationship: await relationship(me, id) });
+  const rel = await relationship(me, id);
+  const { mood, ...profile } = withMood(u);
+  res.json({ ...profile, mood: rel === 'friends' || rel === 'self' ? mood : null, relationship: rel });
 });

@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { api, ApiError } from '@/api/client';
+import { checkNearby } from './nearby';
 
 export const LOCATION_TASK = 'vybe-location-sharing';
 /** Requested cadence. Android may deliver less often (Doze, battery saver); the UI shows real age, not this. */
@@ -45,11 +46,16 @@ export async function uploadFix(loc: Location.LocationObject): Promise<'sent' | 
   return 'failed';
 }
 
+/** Every fix: upload it, then see whether a friend just came close (local notification). */
+async function onFix(loc: Location.LocationObject) {
+  if ((await uploadFix(loc)) !== 'stopped') await checkNearby({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+}
+
 // Must be defined at module scope so Android can run it headless after the app is killed.
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(LOCATION_TASK, async ({ data, error }) => {
   if (error || !data?.locations?.length) return;
   const latest = data.locations.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
-  await uploadFix(latest);
+  await onFix(latest);
 });
 
 export type PermissionLevel = 'none' | 'foreground' | 'background';
@@ -86,12 +92,12 @@ export async function startTracking(): Promise<PermissionLevel> {
   } else if (!foregroundWatch) {
     foregroundWatch = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.Balanced, timeInterval: TARGET_INTERVAL_MS, distanceInterval: 0 },
-      (loc) => void uploadFix(loc),
+      (loc) => void onFix(loc),
     );
   }
   // Send one fix right away so friends don't wait for the first interval.
   Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-    .then((loc) => uploadFix(loc))
+    .then((loc) => onFix(loc))
     .catch(() => {});
   return level;
 }

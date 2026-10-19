@@ -6,7 +6,7 @@ import { friendIds, isSharingActive, locationViewers, locationVisibleOwners } fr
 import { badRequest, conflict, parse } from '../../lib/errors.js';
 import { audit } from '../../lib/audit.js';
 import { emitMany } from '../../realtime.js';
-import { publicUserSelect } from '../users/routes.js';
+import { moodSelect, publicUserSelect, withMood } from '../users/routes.js';
 
 /** Locations older than this are deleted and never shown. */
 export const LOCATION_MAX_AGE_MS = 24 * 3600_000;
@@ -129,7 +129,7 @@ locationsRouter.get('/locations/friends', async (req, res) => {
   const ids = await friendIds(me);
   const visible = await locationVisibleOwners(me, ids);
   const [users, locs] = await Promise.all([
-    db.user.findMany({ where: { id: { in: ids } }, select: publicUserSelect }),
+    db.user.findMany({ where: { id: { in: ids } }, select: { ...publicUserSelect, ...moodSelect } }).then((us) => us.map(withMood)),
     db.currentLocation.findMany({
       where: { userId: { in: [...visible] }, receivedAt: { gt: new Date(Date.now() - LOCATION_MAX_AGE_MS) } },
     }),

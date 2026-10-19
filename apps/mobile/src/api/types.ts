@@ -1,6 +1,18 @@
 // Response shapes of the Vybe API (see API.md). Kept by hand; the server is the source of truth.
 
-export type PublicUser = { id: string; username: string | null; displayName: string | null; avatarMediaId: string | null; bio: string | null };
+import type { AvatarLook } from '@/ui/character';
+
+export type Mood = { emoji: string; text: string | null; setAt: string };
+export type PublicUser = {
+  id: string;
+  username: string | null;
+  displayName: string | null;
+  avatarMediaId: string | null;
+  avatarStyle: AvatarLook | null;
+  bio: string | null;
+  /** Friends only, and only while fresh (24 h). */
+  mood?: Mood | null;
+};
 export type Relationship = 'self' | 'friends' | 'request_sent' | 'request_received' | 'none';
 
 export type Me = PublicUser & {

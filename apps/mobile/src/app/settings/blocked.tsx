@@ -19,7 +19,7 @@ export default function Blocked() {
           <ListItem
             title={item.displayName ?? item.username ?? ''}
             subtitle={`@${item.username}`}
-            left={<Avatar mediaId={item.avatarMediaId} name={item.displayName ?? item.username} />}
+            left={<Avatar mediaId={item.avatarMediaId} look={item.avatarStyle} name={item.displayName ?? item.username} />}
             right={<Button title="Unblock" kind="secondary" style={{ minHeight: 40 }} onPress={() => act.unblock.mutate(item.id, { onSuccess: () => qc.invalidateQueries({ queryKey: ['blocks'] }) })} />}
           />
         )}

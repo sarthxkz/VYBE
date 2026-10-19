@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Switch } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { nearbyEnabled, setNearbyEnabled, NEARBY_M } from '@/features/location/nearby';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { NotificationPrefs } from '@/api/types';
@@ -20,6 +23,13 @@ export default function NotificationSettings() {
     mutationFn: (body: Partial<NotificationPrefs>) => api<NotificationPrefs>('/me/notifications', { method: 'PUT', body }),
     onSuccess: (d) => qc.setQueryData(['notif'], d),
   });
+  const [nearby, setNearby] = useState<boolean | null>(null);
+  useEffect(() => void nearbyEnabled().then(setNearby), []);
+  const toggleNearby = async (on: boolean) => {
+    if (on && (await Notifications.getPermissionsAsync()).status !== 'granted') await Notifications.requestPermissionsAsync();
+    await setNearbyEnabled(on);
+    setNearby(on);
+  };
   return (
     <Screen scroll edges={['bottom']}>
       {!prefs.data ? (
@@ -36,6 +46,13 @@ export default function NotificationSettings() {
           ))}
         </Card>
       )}
+      <Card style={{ marginTop: space.md, paddingVertical: 0 }}>
+        <ListItem
+          title="Friends nearby"
+          subtitle={`Buzz when a friend you can see on the map comes within ${NEARBY_M} m. Worked out on this phone; needs your location sharing on.`}
+          right={<Switch value={!!nearby} disabled={nearby === null} onValueChange={toggleNearby} accessibilityLabel="Friends nearby alerts" />}
+        />
+      </Card>
       <Text variant="caption" muted style={{ marginVertical: space.lg }}>
         Encrypted chats always use generic notifications: the server never has your message text, so it can’t put it in a notification.
       </Text>

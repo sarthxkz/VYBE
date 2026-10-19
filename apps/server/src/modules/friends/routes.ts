@@ -9,7 +9,7 @@ import { audit } from '../../lib/audit.js';
 import { push } from '../../lib/push.js';
 import { emit, isOnline } from '../../realtime.js';
 import { Prisma } from '../../generated/prisma/client.js';
-import { publicUserSelect } from '../users/routes.js';
+import { moodSelect, publicUserSelect, withMood } from '../users/routes.js';
 
 /** Removes everything two users shared once they stop being friends. */
 async function severPair(tx: Tx, a: string, b: string) {
@@ -39,7 +39,7 @@ friendsRouter.use(requireAuth);
 friendsRouter.get('/friends', async (req, res) => {
   const me = uid(req);
   const ids = await friendIds(me);
-  const users = await db.user.findMany({ where: { id: { in: ids } }, select: { ...publicUserSelect, showPresence: true, lastActiveAt: true } });
+  const users = (await db.user.findMany({ where: { id: { in: ids } }, select: { ...publicUserSelect, ...moodSelect, showPresence: true, lastActiveAt: true } })).map(withMood);
   res.json({
     friends: users
       .map(({ showPresence, lastActiveAt, ...u }) => ({

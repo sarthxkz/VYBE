@@ -110,7 +110,7 @@ export default function ChatScreen() {
           headerShown: true,
           headerTitle: () => (
             <Row gap={space.sm}>
-              <Avatar mediaId={peer.data?.avatarMediaId} name={name} size={32} />
+              <Avatar mediaId={peer.data?.avatarMediaId} look={peer.data?.avatarStyle} name={name} size={32} />
               <View>
                 <Text variant="bodyStrong">{name}</Text>
                 <Text variant="caption" color={typing ? c.liveText : c.textMuted}>

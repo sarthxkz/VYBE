@@ -28,6 +28,7 @@ export default function AddFriends() {
   return (
     <Screen edges={['bottom']}>
       <Input label="Search by username" value={q} onChangeText={setQ} autoCapitalize="none" autoCorrect={false} placeholder="e.g. maya.k" style={{ marginTop: space.md }} />
+      <Button title="Invite from contacts or any app" kind="secondary" onPress={() => router.push('/friends/invite')} />
       {search.isError && <Text>{errorText(search.error)}</Text>}
       <FlatList
         data={valid ? (search.data?.users ?? []) : []}
@@ -44,7 +45,7 @@ export default function AddFriends() {
           <ListItem
             title={item.displayName ?? item.username ?? ''}
             subtitle={`@${item.username}`}
-            left={<Avatar mediaId={item.avatarMediaId} name={item.displayName ?? item.username} />}
+            left={<Avatar mediaId={item.avatarMediaId} look={item.avatarStyle} name={item.displayName ?? item.username} />}
             onPress={() => router.push(`/user/${item.id}`)}
             right={
               item.relationship === 'none' ? (

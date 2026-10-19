@@ -80,7 +80,7 @@ export default function PhotosScreen() {
             <Image source={mediaSource(item.mediaId)} style={{ flex: 1 }} contentFit="cover" transition={200} recyclingKey={item.id} />
             <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm }}>
               <Row gap={space.xs}>
-                <Avatar mediaId={item.sender.avatarMediaId} name={item.sender.displayName ?? item.sender.username} size={24} />
+                <Avatar mediaId={item.sender.avatarMediaId} look={item.sender.avatarStyle} name={item.sender.displayName ?? item.sender.username} size={24} />
                 <Text variant="caption" color="#fff" numberOfLines={1} style={{ flex: 1, textShadowColor: '#000', textShadowRadius: 4 }}>
                   {ago(item.createdAt)}
                 </Text>

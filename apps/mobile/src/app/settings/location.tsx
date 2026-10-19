@@ -123,7 +123,7 @@ export default function LocationSettingsScreen() {
                   key={f.id}
                   title={f.displayName ?? f.username ?? ''}
                   subtitle={`@${f.username}`}
-                  left={<Avatar mediaId={f.avatarMediaId} name={f.displayName ?? f.username} size={36} />}
+                  left={<Avatar mediaId={f.avatarMediaId} look={f.avatarStyle} name={f.displayName ?? f.username} size={36} />}
                   right={
                     <Switch
                       value={on}

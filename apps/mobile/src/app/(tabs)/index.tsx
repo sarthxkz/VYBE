@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, FlatList, Pressable, Text as RNText, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Camera, Map, UserLocation, ViewAnnotation, type CameraRef } from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '@/api/client';
-import type { FriendLocation, LocationSettings } from '@/api/types';
-import { ago, freshness, permissionLevel, type PermissionLevel } from '@/features/location/tracking';
+import type { FriendLocation, LocationSettings, Mood, PublicUser } from '@/api/types';
+import { useSession } from '@/stores/session';
+import { ago, freshness, permissionLevel, startTracking, type PermissionLevel } from '@/features/location/tracking';
 import { cluster } from '@/features/location/cluster';
 import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } from '@/ui';
 import { palette, radius, shadow, space, useColors } from '@/theme';
@@ -24,15 +25,47 @@ export default function MapScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [perm, setPerm] = useState<PermissionLevel>('none');
   const [, tick] = useState(0);
+  const me = useSession((st) => st.me);
+  const [myPos, setMyPos] = useState<[number, number] | null>(null);
 
   const friends = useQuery({ queryKey: ['locations', 'friends'], queryFn: () => api<{ friends: FriendLocation[] }>('/locations/friends'), refetchInterval: 60_000 });
   const settings = useQuery({ queryKey: ['locations', 'settings'], queryFn: () => api<LocationSettings>('/locations/settings') });
 
   useEffect(() => {
-    void permissionLevel().then(setPerm);
     const t = setInterval(() => tick((x) => x + 1), 30_000); // keep "x min ago" honest
     return () => clearInterval(t);
   }, []);
+
+  // Re-read the permission whenever the map is shown or the app returns from Android settings. Reading it
+  // only once at mount left a stale "Location is off" banner after the user allowed it elsewhere.
+  const recheck = useCallback(() => void permissionLevel().then(setPerm), []);
+  useFocusEffect(recheck);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => st === 'active' && recheck());
+    return () => sub.remove();
+  }, [recheck]);
+  // Permission just appeared while sharing is on: start sending now instead of after the next app restart.
+  useEffect(() => {
+    if (perm !== 'none' && settings.data?.active) void startTracking();
+  }, [perm, settings.data?.active]);
+
+  // Your character follows you while the map is on screen (the watch stops when you leave the tab).
+  useFocusEffect(
+    useCallback(() => {
+      if (perm === 'none') return;
+      let sub: Location.LocationSubscription | null = null;
+      let cancelled = false;
+      const set = (p: Location.LocationObject | null) => p && !cancelled && setMyPos([p.coords.longitude, p.coords.latitude]);
+      void Location.getLastKnownPositionAsync().then(set).catch(() => {});
+      void Location.watchPositionAsync({ accuracy: Location.Accuracy.Balanced, distanceInterval: 15, timeInterval: 15_000 }, set)
+        .then((w) => (cancelled ? w.remove() : (sub = w)))
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+        sub?.remove();
+      };
+    }, [perm]),
+  );
 
   const located = useMemo(
     () =>
@@ -42,6 +75,14 @@ export default function MapScreen() {
     [friends.data],
   );
   const clusters = useMemo(() => cluster(located, zoom), [located, zoom]);
+  // No friends on the map yet: open on you rather than the whole country.
+  const centered = useRef(false);
+  useEffect(() => {
+    if (myPos && !centered.current && !located.length) {
+      centered.current = true;
+      camera.current?.flyTo({ center: myPos, zoom: 14, duration: 800 });
+    }
+  }, [myPos, located.length]);
   const list = friends.data?.friends ?? [];
   const sel = list.find((f) => f.user.id === selected);
 
@@ -66,7 +107,12 @@ export default function MapScreen() {
         onPress={() => setSelected(null)}
       >
         <Camera ref={camera} initialViewState={located[0] ? { center: [located[0].lng, located[0].lat], zoom: 11 } : { center: [78.9, 22.5], zoom: 3 }} />
-        {perm !== 'none' && <UserLocation />}
+        {perm !== 'none' && !myPos && <UserLocation />}
+        {myPos && me && (
+          <ViewAnnotation id="me" lngLat={myPos} anchor="bottom" onPress={() => router.push('/mood')}>
+            <Pin user={me} mood={me.mood} label="You" ring={c.brand} size={58} />
+          </ViewAnnotation>
+        )}
         {clusters.map((cl) => {
           const one = cl.members.length === 1 ? cl.members[0]!.f : null;
           const ring = one ? (freshness(one.location!.receivedAt) === 'fresh' ? palette.lime400 : palette.amber500) : palette.grape500;
@@ -75,13 +121,17 @@ export default function MapScreen() {
               key={cl.id}
               id={cl.id}
               lngLat={[cl.lng, cl.lat]}
-              anchor="center"
+              anchor={one ? 'bottom' : 'center'}
               onPress={() => (one ? focus(one) : camera.current?.flyTo({ center: [cl.lng, cl.lat], zoom: zoom + 2, duration: 600 }))}
             >
               {one ? (
-                <View accessibilityLabel={`${one.user.displayName ?? one.user.username}, updated ${ago(one.location!.receivedAt)}`} style={[{ borderRadius: 40 }, shadow.float]}>
-                  <Avatar mediaId={one.user.avatarMediaId} name={one.user.displayName ?? one.user.username} size={selected === one.user.id ? 60 : 48} ring={ring} />
-                </View>
+                <Pin
+                  user={one.user}
+                  mood={one.user.mood}
+                  label={`${one.user.displayName ?? one.user.username} · ${ago(one.location!.receivedAt)}`}
+                  ring={ring}
+                  size={selected === one.user.id ? 66 : 54}
+                />
               ) : (
                 <View
                   accessibilityLabel={`${cl.members.length} friends here`}
@@ -99,6 +149,15 @@ export default function MapScreen() {
 
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space.lg }}>
         <Row style={{ marginTop: space.sm }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={me?.mood ? `Your mood: ${me.mood.emoji} ${me.mood.text ?? ''}. Change it` : 'Set your mood'}
+            onPress={() => router.push('/mood')}
+            style={[{ height: 44, borderRadius: radius.pill, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: space.md, gap: space.xs }, shadow.card]}
+          >
+            <Avatar look={me?.avatarStyle} mediaId={me?.avatarMediaId} name={me?.displayName ?? me?.username} size={38} />
+            <RNText style={{ fontSize: 20 }}>{me?.mood?.emoji ?? '＋'}</RNText>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`${status}. Change who can see you`}
@@ -150,12 +209,13 @@ export default function MapScreen() {
         {sel ? (
           <Card style={{ marginHorizontal: space.lg }}>
             <Row>
-              <Avatar mediaId={sel.user.avatarMediaId} name={sel.user.displayName ?? sel.user.username} size={52} />
+              <Avatar mediaId={sel.user.avatarMediaId} look={sel.user.avatarStyle} name={sel.user.displayName ?? sel.user.username} size={52} />
               <View style={{ flex: 1 }}>
                 <Text variant="heading" numberOfLines={1}>
                   {sel.user.displayName ?? sel.user.username}
                 </Text>
                 <FreshnessLine f={sel} />
+                {sel.user.mood && <MoodLine mood={sel.user.mood} />}
               </View>
             </Row>
             <Row style={{ marginTop: space.md }}>
@@ -185,12 +245,13 @@ export default function MapScreen() {
             renderItem={({ item }) => (
               <Card style={{ width: 168, padding: space.md }} onPress={() => (item.location ? focus(item) : router.push(`/user/${item.user.id}`))}>
                 <Row gap={space.sm}>
-                  <Avatar mediaId={item.user.avatarMediaId} name={item.user.displayName ?? item.user.username} size={36} />
+                  <Avatar mediaId={item.user.avatarMediaId} look={item.user.avatarStyle} name={item.user.displayName ?? item.user.username} size={36} />
                   <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
                     {item.user.displayName ?? item.user.username}
                   </Text>
                 </Row>
                 <FreshnessLine f={item} compact />
+                {item.user.mood && <MoodLine mood={item.user.mood} compact />}
               </Card>
             )}
           />
@@ -209,6 +270,36 @@ function FreshnessLine({ f, compact }: { f: FriendLocation; compact?: boolean })
   return (
     <Text variant="caption" color={color} style={{ marginTop: compact ? space.xs : 0 }}>
       {label}
+    </Text>
+  );
+}
+
+/** Map marker: the friend's character with a mood bubble and a name tag (Snapchat-style, Vybe colours). */
+function Pin({ user, mood, label, ring, size }: { user: PublicUser; mood?: Mood | null; label: string; ring: string; size: number }) {
+  const c = useColors();
+  return (
+    <View style={{ alignItems: 'center' }} accessibilityLabel={`${label}${mood ? `, mood ${mood.emoji} ${mood.text ?? ''}` : ''}`}>
+      <View style={[{ borderRadius: size }, shadow.float]}>
+        <Avatar mediaId={user.avatarMediaId} look={user.avatarStyle} name={user.displayName ?? user.username} size={size} ring={ring} />
+        {mood && (
+          <View style={[{ position: 'absolute', right: -10, top: -8, backgroundColor: c.surface, borderRadius: 16, paddingHorizontal: 4, paddingVertical: 1 }, shadow.card]}>
+            <RNText style={{ fontSize: size * 0.32 }}>{mood.emoji}</RNText>
+          </View>
+        )}
+      </View>
+      <View style={[{ marginTop: 4, backgroundColor: c.surface, borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 2, maxWidth: 160 }, shadow.card]}>
+        <Text variant="caption" numberOfLines={1} style={{ fontWeight: '600' }}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function MoodLine({ mood, compact }: { mood: Mood; compact?: boolean }) {
+  return (
+    <Text variant="caption" muted numberOfLines={1} style={{ marginTop: compact ? 2 : space.xs }}>
+      {mood.emoji} {mood.text ?? 'vibing'}
     </Text>
   );
 }

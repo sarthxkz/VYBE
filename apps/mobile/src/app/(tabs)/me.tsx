@@ -18,16 +18,26 @@ export default function MeScreen() {
   return (
     <Screen scroll edges={['top']}>
       <View style={{ alignItems: 'center', gap: space.xs, marginTop: space.xl }}>
-        <Avatar mediaId={me?.avatarMediaId} name={me?.displayName ?? me?.username} size={96} ring={c.brand} />
+        <Avatar mediaId={me?.avatarMediaId} look={me?.avatarStyle} name={me?.displayName ?? me?.username} size={96} ring={c.brand} />
         <Text variant="title">{me?.displayName ?? me?.username}</Text>
         <Text muted>@{me?.username}</Text>
-        <Button title="Edit profile" kind="secondary" style={{ marginTop: space.sm }} onPress={() => router.push('/settings/profile')} />
+        {me?.mood && (
+          <Text muted>
+            {me.mood.emoji} {me.mood.text ?? ''}
+          </Text>
+        )}
+        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
+          <Button title="Edit avatar" kind="secondary" onPress={() => router.push('/settings/avatar')} />
+          <Button title={me?.mood ? 'Change vibe' : 'Set vibe'} kind="secondary" onPress={() => router.push('/mood')} />
+        </View>
+        <Button title="Edit profile" kind="ghost" onPress={() => router.push('/settings/profile')} />
       </View>
       <SectionTitle>Your privacy</SectionTitle>
       <Card style={{ paddingVertical: 0 }}>
         {item('Privacy dashboard', 'Everything you share, in one place', '/settings', 'shield-checkmark')}
         {item('Location sharing', 'Who sees you, Ghost Mode, timers', '/settings/location', 'navigate')}
         {item('Friends', 'Requests, friends, search', '/friends', 'people')}
+        {item('Invite friends', 'From your contacts or any app', '/friends/invite', 'paper-plane')}
         {item('Blocked people', 'People who can’t reach you', '/settings/blocked', 'hand-left')}
       </Card>
       <SectionTitle>Account</SectionTitle>

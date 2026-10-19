@@ -33,7 +33,7 @@ export default function FriendsScreen() {
                 key={r.id}
                 title={r.user.displayName ?? r.user.username ?? ''}
                 subtitle={`@${r.user.username} wants to be friends`}
-                left={<Avatar mediaId={r.user.avatarMediaId} name={r.user.displayName ?? r.user.username} />}
+                left={<Avatar mediaId={r.user.avatarMediaId} look={r.user.avatarStyle} name={r.user.displayName ?? r.user.username} />}
                 onPress={() => router.push(`/user/${r.user.id}`)}
                 right={
                   <Row gap={space.xs}>
@@ -49,7 +49,7 @@ export default function FriendsScreen() {
                 key={r.id}
                 title={r.user.displayName ?? r.user.username ?? ''}
                 subtitle="Request pending"
-                left={<Avatar mediaId={r.user.avatarMediaId} name={r.user.displayName ?? r.user.username} />}
+                left={<Avatar mediaId={r.user.avatarMediaId} look={r.user.avatarStyle} name={r.user.displayName ?? r.user.username} />}
                 right={<Button title="Cancel" kind="ghost" style={{ minHeight: 40 }} onPress={() => act.cancel.mutate(r.id)} />}
               />
             ))}
@@ -65,7 +65,7 @@ export default function FriendsScreen() {
           <ListItem
             title={item.displayName ?? item.username ?? ''}
             subtitle={item.online ? 'Online' : item.lastActiveAt ? `Active ${ago(item.lastActiveAt)}` : `@${item.username}`}
-            left={<Avatar mediaId={item.avatarMediaId} name={item.displayName ?? item.username} ring={item.online ? c.live : undefined} />}
+            left={<Avatar mediaId={item.avatarMediaId} look={item.avatarStyle} name={item.displayName ?? item.username} ring={item.online ? c.live : undefined} />}
             onPress={() => router.push(`/user/${item.id}`)}
             right={
               <Pressable accessibilityRole="button" accessibilityLabel={`Message ${item.displayName ?? item.username}`} hitSlop={12} onPress={() => router.push(`/chat/${item.id}`)}>

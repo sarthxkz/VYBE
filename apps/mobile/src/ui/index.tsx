@@ -16,7 +16,8 @@ import {
 import { Image } from 'expo-image';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { font, radius, shadow, space, type as typeScale, useColors, type TypeVariant } from '@/theme';
+import { font, palette, radius, shadow, space, type as typeScale, useColors, type TypeVariant } from '@/theme';
+import { Character, type AvatarLook } from './character';
 import { mediaSource } from '@/api/client';
 
 export function Text({ variant = 'body', muted, color, style, ...p }: TextProps & { variant?: TypeVariant; muted?: boolean; color?: string }) {
@@ -133,7 +134,7 @@ export function Card({ children, style, onPress }: { children: ReactNode; style?
 
 const avatarColors = ['#6C4CF5', '#FF6B4A', '#1F9D57', '#3EC6FF', '#E5512F', '#5536DB'];
 
-export function Avatar({ mediaId, name, size = 44, ring }: { mediaId?: string | null; name?: string | null; size?: number; ring?: string }) {
+export function Avatar({ mediaId, name, size = 44, ring, look }: { mediaId?: string | null; name?: string | null; size?: number; ring?: string; look?: AvatarLook | null }) {
   const label = (name ?? '?').trim();
   const initials = label.slice(0, 1).toUpperCase();
   const bg = avatarColors[(label.charCodeAt(0) || 0) % avatarColors.length];
@@ -143,7 +144,11 @@ export function Avatar({ mediaId, name, size = 44, ring }: { mediaId?: string | 
       accessibilityLabel={`${label} avatar`}
       style={[box, { backgroundColor: bg, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, ring && { borderWidth: 3, borderColor: ring }]}
     >
-      {mediaId ? (
+      {look ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.grape100 }]}>
+          <Character look={look} size={size} />
+        </View>
+      ) : mediaId ? (
         <Image source={mediaSource(mediaId)} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
       ) : (
         <RNText style={{ color: '#fff', fontFamily: font.display, fontSize: size * 0.42 }}>{initials}</RNText>
@@ -270,3 +275,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
 });
+export { Character, randomLook, PART_COUNTS, type AvatarLook } from './character';

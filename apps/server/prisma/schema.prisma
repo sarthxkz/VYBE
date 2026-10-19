@@ -55,6 +55,10 @@ model User {
   displayName     String?
   bio             String?
   avatarMediaId   String?   @unique @db.Uuid
+  avatarStyle     Json? // illustrated avatar parts (validated in users/routes.ts)
+  moodEmoji       String?
+  moodText        String?
+  moodSetAt       DateTime? // moods show for 24 h
   showPresence    Boolean   @default(true)
   lastActiveAt    DateTime?
   createdAt       DateTime  @default(now())

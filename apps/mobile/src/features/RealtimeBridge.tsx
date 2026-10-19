@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import Signal from '@modules/vybe-signal';
 import { connectRealtime, disconnectRealtime, subscribe } from '@/lib/realtime';
 import { queryClient } from '@/lib/query';
@@ -27,6 +29,11 @@ export function RealtimeBridge() {
     connectRealtime();
     const offChat = startChatRealtime();
     const offPush = watchPushTokenRotation();
+    // Tapping a "friend nearby" alert opens their profile. Only our own in-app paths are followed.
+    const tap = Notifications.addNotificationResponseReceivedListener((r) => {
+      const url = r.notification.request.content.data?.url;
+      if (typeof url === 'string' && /^\/user\/[0-9a-f-]{36}$/.test(url)) router.push(url as `/user/${string}`);
+    });
     const offEvents = subscribe((ev) => {
       const inv = (key: string) => void queryClient.invalidateQueries({ queryKey: [key] });
       if (ev.type.startsWith('friend:')) {
@@ -53,6 +60,7 @@ export function RealtimeBridge() {
     return () => {
       offChat();
       offPush();
+      tap.remove();
       offEvents();
       disconnectRealtime();
     };

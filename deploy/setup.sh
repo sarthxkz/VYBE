@@ -26,6 +26,8 @@ ENV
   echo "setup: wrote .env (mode 600)"
 fi
 
+# Static pages (invite landing page) live next to the update files Caddy serves.
+mkdir -p public && cp -r web/. public/
 docker compose up -d --build
 
 echo "setup: done. Check: curl https://$PUBLIC_HOST/ready"
