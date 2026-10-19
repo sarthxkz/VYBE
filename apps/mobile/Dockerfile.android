@@ -21,7 +21,10 @@ ENV APP_VARIANT=production EXPO_PUBLIC_API_URL=$EXPO_PUBLIC_API_URL NODE_ENV=pro
 RUN npx expo prebuild -p android --clean --no-install
 # arm64 only: every phone from the last ~8 years; add ABIs here if you need emulators/x86.
 RUN --mount=type=cache,target=/root/.gradle cd android \
- && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --console=plain
+ && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --console=plain \
+    --max-workers=2 -Porg.gradle.parallel=false -Pkotlin.compiler.execution.strategy=in-process \
+    "-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1g"
+# ^ capped parallelism: Docker Desktop's default VM (half of a 16 GB host) hung at full parallelism.
 
 FROM scratch AS export
 COPY --from=build /app/android/app/build/outputs/apk/release/app-release.apk /vybe-release.apk
