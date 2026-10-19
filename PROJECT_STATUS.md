@@ -28,6 +28,12 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - Published: https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.0-1.apk (`latest.json` versionCode 1). The download was verified from the VM (200, full 76 MB, correct content type).
 - Self-hosted OTA (code-signed) and the in-app APK update prompt are built in. **Not yet exercised on a phone.**
 
+## Launch fix + first OTA (2026-10-20)
+- **"Unmatched route" on launch, found and fixed:** guarded screens had no redirect target, so expo-router fell back to the alphabetically first unguarded route, `(auth)`, which has no index screen. Every `Stack.Protected` now has an explicit `redirectTo`.
+- **Crash on launch: not reproduced yet.** The emulator here is x86_64-only with no ARM translation, and the x86_64 build was stopped by Windows memory pressure. It may have been a consequence of the unmatched route; this is unconfirmed.
+- **OTA update published for runtime 0.1.0** (router fix, new logo, animated intro). Verified from outside: protocol headers, the manifest signature verifies against `certs/ota-certificate.pem`, and the bundle and asset hashes match. **Not yet verified on a phone.**
+- **The new launcher icon needs a new APK** (icons are native resources); it's not built yet.
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
