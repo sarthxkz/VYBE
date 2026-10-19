@@ -28,6 +28,8 @@ npx expo prebuild -p android
 npx expo run:android               # builds the dev client and installs it on a device/emulator
 ```
 
+**Windows:** React Native codegen paths exceed 260 characters. Enable long paths once (admin): `reg add HKLM\SYSTEM\CurrentControlSet\Control\FileSystem /v LongPathsEnabled /t REG_DWORD /d 1 /f`, and install SDK CMake 4.1.2 (`sdkmanager "cmake;4.1.2"`). The app is configured to use it (`plugins/withCmakeVersion.js`).
+
 The emulator reaches your machine's API at `http://10.0.2.2:3000` (the default). For a physical phone, set `EXPO_PUBLIC_API_URL` to your machine's LAN address or the deployed HTTPS URL before building.
 
 ## Tests

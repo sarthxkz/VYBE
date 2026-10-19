@@ -52,6 +52,7 @@ const config: ExpoConfig = {
     ['expo-notifications', { color: '#6C4CF5' }],
     '@maplibre/maplibre-react-native',
     './plugins/withCoreLibraryDesugaring',
+    './plugins/withCmakeVersion',
     ...(process.env.GOOGLE_SERVICES_JSON ? ['@react-native-google-signin/google-signin'] : []),
     [
       'expo-build-properties',
