@@ -4,9 +4,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/prisma.config.ts apps/server/
 COPY apps/server/prisma apps/server/prisma
-RUN npm ci --no-audit --no-fund
+# prisma generate (postinstall) only parses the URL; the real one comes from .env at runtime.
+RUN DATABASE_URL=postgresql://build@localhost/build npm ci --no-audit --no-fund
 COPY apps/server apps/server
-RUN npm run build -w apps/server
+RUN DATABASE_URL=postgresql://build@localhost/build npm run build -w apps/server
 
 # Separate pruned copy so the runtime image carries no dev tools (prisma CLI stays in `build`, used for migrations).
 FROM build AS prod
