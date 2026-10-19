@@ -1,0 +1,16 @@
+# Signed-in account required. Verifies Ghost Mode and the sharing modes are reachable and toggle.
+appId: app.vybe
+---
+- launchApp
+- tapOn: "Map"
+- tapOn:
+    text: ".*Change who can see you"
+- assertVisible: "Ghost Mode"
+- tapOn: "All my friends"
+- tapOn: "Not now"            # decline the location pre-prompt: sharing must still save
+- assertVisible: "For how long"
+- tapOn:
+    id: "Ghost Mode"
+    optional: true
+- tapOn: "Nobody"
+- assertNotVisible: "For how long"

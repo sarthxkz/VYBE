@@ -18,14 +18,16 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 | 10 | Security & QA | 🟡 | 54 server integration tests + 4 app unit tests. Log redaction, stack-trace and body-size tests. Pending: device E2E (Maestro), accessibility audit on device, external pentest. |
 
 ## Verified commands (2026-10-19)
-- Server: `tsc --noEmit` ✅, `eslint` ✅, `vitest run` ✅ 54/54 (real Postgres 17), `tsc -p tsconfig.build.json` + boot + `/ready` ✅.
+- Server: `tsc --noEmit` ✅, `eslint` ✅, `vitest run` ✅ **54/54** (6 files, real Postgres 17), `tsc -p tsconfig.build.json` + boot + `/ready` ✅.
 - App: `tsc --noEmit` ✅, `eslint` ✅ (0 errors), `jest` ✅ 4/4.
-- Android `assembleDebug`: see below.
+- Android `assembleDebug` (JDK 25 + Gradle 9.4.1 work): all Kotlin compiles, **including the `vybe-signal` module against libsignal-android 0.105.1** (compiled classes produced). The build then **fails at the C++ step on Windows**: ninja 1.10 (bundled with SDK CMake 3.22.1) can't stat the react-native-gesture-handler codegen object path (>260 chars), and `LongPathsEnabled=0` on this PC. `subst` and `CMAKE_OBJECT_PATH_MAX` didn't help. **No APK yet.** Fix options are listed under blockers.
+- graphify (AST, 110 code files → 790 nodes, 37 communities): **no import cycles**; every resource route module imports both `requireAuth` and `authz.ts`. Report: `graphify-out/GRAPH_REPORT.md`.
 
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
-| SSH username for 161.153.37.106 (+ OK for each change) | Phase 9 | username; then approve provisioning steps |
+| Windows long-path build fix | First APK | Either enable long paths (admin) so a newer ninja can be used, build in a Docker Linux container, or use EAS cloud build |
+| SSH username for 161.153.37.106 (+ OK for each change) | Phase 9 | `ubuntu` with `~/.ssh/bunkr_oracle` was rejected; need the right user/key |
 | SMTP credentials | Email verification in production | `SMTP_URL`, `MAIL_FROM` |
 | Firebase project | Push notifications, Google sign-in | `google-services.json`, service-account JSON, OAuth web client ID |
 | age key pair | Encrypted backups | Public key on the VM; private key kept offline |

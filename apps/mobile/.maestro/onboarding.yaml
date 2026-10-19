@@ -1,0 +1,16 @@
+# Run on a device/emulator with the dev build installed and the API reachable:
+#   maestro test apps/mobile/.maestro/onboarding.yaml -e EMAIL=new1@test.local
+# The verification code comes from Mailpit (http://localhost:8025) in local dev.
+appId: app.vybe
+---
+- clearState
+- launchApp
+- assertVisible: "Your people, on one map"
+- tapOn: "Skip"
+- tapOn: "Create account"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: "correct horse battery"
+- tapOn: "Create account"
+- assertVisible: "Check your email"

@@ -1,4 +1,4 @@
-import { FlatList, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFriendActions, useFriends, useRequests } from '@/features/friends/hooks';
 import { ago } from '@/features/location/tracking';
@@ -67,7 +67,13 @@ export default function FriendsScreen() {
             subtitle={item.online ? 'Online' : item.lastActiveAt ? `Active ${ago(item.lastActiveAt)}` : `@${item.username}`}
             left={<Avatar mediaId={item.avatarMediaId} name={item.displayName ?? item.username} ring={item.online ? c.live : undefined} />}
             onPress={() => router.push(`/user/${item.id}`)}
-            right={<Text variant="label" color={c.link} onPress={() => router.push(`/chat/${item.id}`)} accessibilityRole="button">Message</Text>}
+            right={
+              <Pressable accessibilityRole="button" accessibilityLabel={`Message ${item.displayName ?? item.username}`} hitSlop={12} onPress={() => router.push(`/chat/${item.id}`)}>
+                <Text variant="label" color={c.link}>
+                  Message
+                </Text>
+              </Pressable>
+            }
           />
         )}
       />
