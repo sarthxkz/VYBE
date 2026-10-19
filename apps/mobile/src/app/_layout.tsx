@@ -42,6 +42,9 @@ export default function RootLayout() {
 
   const signedIn = status === 'signedIn';
   const needsProfile = signedIn && !!me && !me.username;
+  // Explicit redirect for any guarded screen. Without it the router falls back to the first unguarded
+  // route alphabetically, "(auth)", which has no index screen, so users landed on "Unmatched route".
+  const target = signedIn ? (needsProfile ? '/setup-profile' : '/') : introSeen ? '/sign-in' : '/intro';
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: c.bg }}>
@@ -51,16 +54,16 @@ export default function RootLayout() {
         <OfflineBanner />
         <AppUpdateBanner />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
-          <Stack.Protected guard={!signedIn}>
-            <Stack.Protected guard={!introSeen}>
+          <Stack.Protected guard={!signedIn} redirectTo={target}>
+            <Stack.Protected guard={!introSeen} redirectTo={target}>
               <Stack.Screen name="intro" options={{ animation: 'fade' }} />
             </Stack.Protected>
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
-          <Stack.Protected guard={needsProfile}>
+          <Stack.Protected guard={needsProfile} redirectTo={target}>
             <Stack.Screen name="setup-profile" />
           </Stack.Protected>
-          <Stack.Protected guard={signedIn && !needsProfile}>
+          <Stack.Protected guard={signedIn && !needsProfile} redirectTo={target}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="chat/[id]" />
             <Stack.Screen name="user/[id]" options={{ presentation: 'modal' }} />
