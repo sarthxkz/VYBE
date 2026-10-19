@@ -8,13 +8,13 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 | 1 | Foundation, design system, tooling | ✅ | Server: TS strict, ESLint, vitest. App: TS strict, ESLint (expo), jest-expo. Design tokens with AA-checked contrast, UI kit, brand icon and splash (`scripts/make-icons.mjs`). |
 | 2 | Auth & onboarding | ✅ server · 🟡 app | 11 auth tests: enumeration-safe register/forgot, code lockout, refresh rotation + reuse revocation, instant logout, expired/forged JWT, reset revokes all sessions, session list/revoke. App screens built: intro, sign-up, verify, sign-in, forgot/reset, profile setup. |
 | 2b | Google sign-in | ⛔ | Implemented on both sides (server verifies the ID token). Needs an OAuth client: `GOOGLE_CLIENT_IDS` + `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` + `google-services.json`. Not tested end to end. |
-| 3 | Schema, friends, blocking | ✅ | 1 migration, 27 tables. Friend tests incl. concurrent opposite requests, block severs everything, search excludes blocked. |
+| 3 | Schema, friends, blocking | ✅ | 1 migration, 21 tables. Friend tests incl. concurrent opposite requests, block severs everything, search excludes blocked. |
 | 4 | Map & location | ✅ server · 🟡 app | 10 location tests (non-friend, SELECTED grants, ghost deletes the row, block, temporary expiry, 24 h purge, validation, throttle, server-stamped time). App: MapLibre map, clustering (unit-tested), freshness from `receivedAt` (unit-tested), settings, two-step permission flow, foreground service at a 120 s target. **Real cadence under Doze is unverified.** |
 | 5 | Camera & private photos | ✅ server · 🟡 app | 9 tests: EXIF stripped on the server, fake images rejected, size limits, recipient-only access, ID swap → 404, unauthenticated → 401, blocked sender hidden, sender delete removes the file. App: camera (flip/flash/preview/retake), gallery, client-side re-encode, upload progress, retry, feed, viewer, report. |
 | 6 | E2EE chat | ✅ protocol via API · 🟡 Kotlin module | 8 tests incl. a **real libsignal PQXDH session through the API**, ciphertext-only storage, one-time-key single use under concurrency, idempotency, STALE_DEVICE, block/non-friend refusal. Kotlin module wraps libsignal-android 0.105.1 with a Keystore-encrypted state store; app has SQLCipher history, receipts, replies, typing, delete-for-everyone, encrypted images, safety numbers. **The Kotlin module compiles (see build) but hasn't been exercised on a device.** |
 | 7 | Realtime & push | ✅ WS · ⛔ FCM | 4 WS tests (unauth/revoked rejected, location fan-out only to authorized viewers, typing to non-friend refused, logout closes the socket). FCM is wired up (generic payloads, mutes, prefs, token rotation) but **needs Firebase credentials**. |
 | 8 | Privacy, legal, deletion | ✅ server · 🟡 app | Deletion test (re-auth, rows + files + sessions + audit removed, login fails afterwards); export endpoint. App: privacy dashboard, settings screens, blocked list, sessions, delete account. Legal pages are **drafts marked "pending legal review"**. |
-| 9 | Oracle deploy | 🟡 | Scripts and units written (`deploy/`), DEPLOYMENT.md. **Not run on the VM yet**; read-only inspection waits on the SSH username. |
+| 9 | Oracle deploy | ✅ live · 🟡 backups | **Live at https://api.161-153-37-106.sslip.io** (2026-10-19): Docker Compose behind Bunkr's Caddy (the VM already served Bunkr on 80/443). Verified: migration applied (21 tables), `/ready` → `{"ok":true}` over HTTPS with a Let's Encrypt cert, no published container ports, 3000/5432 filtered from outside, Bunkr `/health` still 200. **Not yet:** SMTP (sign-up can't verify), backups (need your age key), host firewall review (sudo needs a password). |
 | 10 | Security & QA | 🟡 | 54 server integration tests + 4 app unit tests. Log redaction, stack-trace and body-size tests. Pending: device E2E (Maestro), accessibility audit on device, external pentest. |
 
 ## Verified commands (2026-10-19)
@@ -27,10 +27,9 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 | Blocker | Unblocks | What to provide |
 |---|---|---|
 | Windows long-path build fix | First APK | Either enable long paths (admin) so a newer ninja can be used, build in a Docker Linux container, or use EAS cloud build |
-| SSH username for 161.153.37.106 (+ OK for each change) | Phase 9 | `ubuntu` with `~/.ssh/bunkr_oracle` was rejected; need the right user/key |
-| SMTP credentials | Email verification in production | `SMTP_URL`, `MAIL_FROM` |
+| SMTP credentials on the VM | **Sign-up on the live server** (verification codes) | `SMTP_URL`, `MAIL_FROM` in `~/vybe/deploy/.env` |
 | Firebase project | Push notifications, Google sign-in | `google-services.json`, service-account JSON, OAuth web client ID |
-| age key pair | Encrypted backups | Public key on the VM; private key kept offline |
+| age key pair | Encrypted backups | Public key in `~/.config/vybe/backup-recipients.txt` on the VM; private key kept offline |
 | Physical Android phone (USB debugging) | Background location cadence, camera, FCM, Keystore, E2EE on device | — |
 | Legal review | Public launch | Counsel review of Privacy Policy / Terms / Guidelines |
 | Support inbox | In-app support link | `EXPO_PUBLIC_SUPPORT_EMAIL` |
