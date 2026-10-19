@@ -87,3 +87,18 @@ Connect with an `Authorization: Bearer` header. Failed auth → HTTP 401. The so
 
 Server → client: `hello`, `location:update`, `location:removed`, `message:new`, `message:delivered`, `typing`, `presence`, `friend:request`, `friend:accepted`, `friend:removed`, `photo:new`, `keys:changed`, `error`.
 Client → server: `{type:'typing', data:{to, on}}` (friends only, max 1/s), `{type:'ping'}`. There are no client-chosen subscriptions: the server only pushes events the user is authorized to receive.
+
+## Chat backup 🔒
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/backup` | `{exists:false}` or `{exists:true, salt, size, updatedAt}` |
+| GET | `/backup/data` | The sealed blob (`application/octet-stream`) |
+| PUT | `/backup?salt=<base64 16 bytes>` | Raw `application/octet-stream` body, ≤ 50 MB, 30/hour. Replaces the previous backup. The server can't read or verify it. |
+| DELETE | `/backup` | Turn off |
+
+## Instants ("Blinks" in the app)
+`POST /photos` accepts `instant: true`: the post gets `expiresAt` = now + 24 h. A recipient can load it until 2 minutes after `POST /photos/:id/viewed`; then `/photos/:id` and `/media/:id` return 404 and it leaves the inbox. The cleanup job deletes the file once everyone opened it, or at expiry.
+
+## Client errors
+`POST /client-errors` (no auth, 10/min/IP): `{message ≤500, stack? ≤4000, path?, version?, updateId?}` from the app's error screen. Logged at warn level.
+

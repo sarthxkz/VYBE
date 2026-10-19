@@ -16,6 +16,9 @@
 | **Current location** (lat, lng, accuracy, captured/received time) | Only while sharing is active | Show on friends' map | Authorized friends | `current_locations` (1 row) | Deleted on stop/ghost/expiry, max **24 h** | Deleted |
 | Photos (re-encoded, no EXIF) + captions | User sends | Private sharing | Sender + chosen recipients | media disk + DB | Until the sender deletes (recipients may hide) | Sender's photos deleted; recipients lose access |
 | Chat messages | User sends | Messaging | **End-to-end encrypted**: only the two devices | Ciphertext in DB until delivered; plaintext only in the device's SQLCipher DB | Server: until ack, max **30 days** | Pending ciphertext deleted |
+| **Encrypted chat backup** (opt-in) | User turns on backup | Restore chats on a new phone or login | **Nobody but the user**: sealed on the phone with AES-256-GCM, key from the user's backup password (PBKDF2-SHA256, 600k); the server holds ciphertext + public salt | `chat_backups` (1 row) | Until replaced, turned off, or the account is deleted | Deleted |
+| Chat images (end-to-end encrypted blobs) | User sends an image in chat | Show it to the friend, and after a restore | The two friends (key is inside the E2EE message) | media disk | Until the sender's account is deleted | Deleted |
+| Instant photos ("Blinks") | User sends an Instant | View-once photo | Sender + chosen friends, each once | media disk + DB | Deleted once every recipient opened it (2-min grace) or after **24 h** | Deleted |
 | Chat attachments | User sends | Messaging | E2EE (key inside the message) | Ciphertext blob on disk | Max 30 days | Deleted |
 | Public encryption keys | First sign-in per install | Start E2EE sessions | Friends (bundle fetch) | `devices`, `one_time_prekeys` | Until replaced | Deleted |
 | Sessions (device name, timestamps), push token | Login | Security, notifications | User | `sessions` | Expired/revoked sessions purged after 30 days | Deleted |

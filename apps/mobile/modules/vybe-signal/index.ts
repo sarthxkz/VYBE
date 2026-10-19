@@ -27,6 +27,8 @@ type VybeSignalModule = {
   identityChanged(userId: string): Promise<boolean>;
   acknowledgeIdentity(userId: string): Promise<void>;
   resetSession(userId: string): Promise<void>;
+  /** PBKDF2-SHA256 (600k) → base64 256-bit key for the encrypted chat backup. */
+  deriveBackupKey(password: string, saltB64: string): Promise<string>;
   wipe(): Promise<void>;
 };
 

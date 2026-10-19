@@ -8,7 +8,9 @@ import { api } from '@/api/client';
 import type { LocationSettings } from '@/api/types';
 import { onSignOut, useSession } from '@/stores/session';
 import { ensureKeys, retryUnsent, startChatRealtime, syncInbox } from './chat/service';
-import { wipeChatDb } from './chat/db';
+import { conversations, wipeChatDb } from './chat/db';
+import { forgetBackupKey, maybeBackup, shouldOfferRestore } from './chat/backup';
+import { AppState } from 'react-native';
 import { startTracking, stopTracking } from './location/tracking';
 import { registerPush, watchPushTokenRotation } from './notifications';
 
@@ -17,6 +19,7 @@ onSignOut(async () => {
   disconnectRealtime();
   await stopTracking();
   await wipeChatDb();
+  await forgetBackupKey().catch(() => {});
   await Signal.wipe().catch(() => {});
   queryClient.clear();
 });
@@ -29,6 +32,8 @@ export function RealtimeBridge() {
     connectRealtime();
     const offChat = startChatRealtime();
     const offPush = watchPushTokenRotation();
+    // Encrypted chat backup runs when the app goes to the background (at most every 30 min).
+    const bg = AppState.addEventListener('change', (s) => s === 'background' && void maybeBackup());
     // Tapping a "friend nearby" alert opens their profile. Only our own in-app paths are followed.
     const tap = Notifications.addNotificationResponseReceivedListener((r) => {
       const url = r.notification.request.content.data?.url;
@@ -50,6 +55,7 @@ export function RealtimeBridge() {
       await ensureKeys(me.id).catch(() => {});
       await syncInbox().catch(() => {});
       await retryUnsent().catch(() => {});
+      if (await shouldOfferRestore((await conversations().catch(() => [])).length)) router.push('/restore-chats');
       await registerPush(false);
       // Recover location sharing after an app restart: follow the server's state, not stale local state.
       const s = await api<LocationSettings>('/locations/settings').catch(() => null);
@@ -61,6 +67,7 @@ export function RealtimeBridge() {
       offChat();
       offPush();
       tap.remove();
+      bg.remove();
       offEvents();
       disconnectRealtime();
     };

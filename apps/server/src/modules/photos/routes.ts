@@ -15,11 +15,16 @@ const cursorQuery = z.object({ cursor: z.iso.datetime().optional() });
 const postSelect = {
   id: true,
   caption: true,
+  instant: true,
+  expiresAt: true,
   createdAt: true,
   mediaId: true,
   media: { select: { width: true, height: true } },
   sender: { select: publicUserSelect },
 } as const;
+
+/** Instants: view once, gone after opening or after this long. */
+export const INSTANT_TTL_MS = 24 * 3600_000;
 
 export const photosRouter = Router();
 photosRouter.use(requireAuth);
@@ -30,6 +35,7 @@ photosRouter.post('/photos', async (req, res) => {
       mediaId: z.uuid(),
       caption: z.string().trim().max(200).optional(),
       recipientIds: z.array(z.uuid()).min(1).max(50),
+      instant: z.boolean().optional(),
     }),
     req.body,
   );
@@ -45,6 +51,7 @@ photosRouter.post('/photos', async (req, res) => {
       senderId: me,
       mediaId: media.id,
       caption: body.caption || null,
+      ...(body.instant && { instant: true, expiresAt: new Date(Date.now() + INSTANT_TTL_MS) }),
       recipients: { create: recipients.map((recipientId) => ({ recipientId })) },
     },
     select: { id: true, createdAt: true },
@@ -64,6 +71,8 @@ photosRouter.get('/photos/inbox', async (req, res) => {
     where: {
       recipientId: me,
       ...(cursor && { createdAt: { lt: new Date(cursor) } }),
+      // Instants vanish from the inbox once opened or expired.
+      NOT: { post: { instant: true }, OR: [{ viewedAt: { not: null } }, { post: { expiresAt: { lt: new Date() } } }] },
       post: { sender: { blocking: { none: { blockedId: me } }, blockedBy: { none: { blockerId: me } } } },
     },
     orderBy: { createdAt: 'desc' },

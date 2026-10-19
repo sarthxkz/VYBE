@@ -86,14 +86,22 @@ export async function locationViewers(owner: string, c: Client = db) {
 }
 
 /** Sender, or a listed recipient who has not been blocked by/blocked the sender. */
+/** After opening an Instant, a recipient can still load it this long (slow networks, image retries). */
+export const INSTANT_VIEW_GRACE_MS = 2 * 60_000;
+
 export async function canViewPhoto(postId: string, viewer: string, c: Client = db) {
   const post = await c.photoPost.findUnique({
     where: { id: postId },
-    select: { senderId: true, recipients: { where: { recipientId: viewer }, select: { recipientId: true } } },
+    select: { senderId: true, instant: true, expiresAt: true, recipients: { where: { recipientId: viewer }, select: { viewedAt: true } } },
   });
   if (!post) return false;
+  if (post.expiresAt && post.expiresAt < new Date()) return false;
   if (post.senderId === viewer) return true;
-  return post.recipients.length > 0 && !(await isBlockedEither(post.senderId, viewer, c));
+  const r = post.recipients[0];
+  if (!r) return false;
+  // Instants are view-once: gone for this recipient shortly after they open it.
+  if (post.instant && r.viewedAt && Date.now() - r.viewedAt.getTime() > INSTANT_VIEW_GRACE_MS) return false;
+  return !(await isBlockedEither(post.senderId, viewer, c));
 }
 
 /** Download authorization for a stored media object. */

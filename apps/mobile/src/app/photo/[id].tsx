@@ -45,7 +45,21 @@ export default function PhotoViewer() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      {photo.data && <Image source={mediaSource(photo.data.mediaId)} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={photo.data.caption ?? 'Photo'} />}
+      {photo.data && (
+        <Image
+          source={mediaSource(photo.data.mediaId)}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          // Blinks are view-once: keep them in memory only, never in the disk cache.
+          cachePolicy={photo.data.instant ? 'memory' : 'memory-disk'}
+          accessibilityLabel={photo.data.caption ?? 'Photo'}
+        />
+      )}
+      {photo.data?.instant && !mine && (
+        <View style={{ position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, paddingHorizontal: space.lg, paddingVertical: space.sm }}>
+          <Text variant="label" color="#fff">✨ Blink · gone when you close it</Text>
+        </View>
+      )}
       {photo.isError && <ErrorState message="This photo isn’t available anymore." onRetry={() => router.back()} />}
       <SafeAreaView edges={['top']} style={{ padding: space.lg }}>
         {photo.data && (

@@ -24,6 +24,8 @@ import org.signal.libsignal.protocol.state.PreKeyBundle
 import org.signal.libsignal.protocol.state.PreKeyRecord
 import org.signal.libsignal.protocol.state.SignedPreKeyRecord
 import org.signal.libsignal.protocol.util.KeyHelper
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 private fun ByteArray.b64() = Base64.encodeToString(this, Base64.NO_WRAP)
 private fun String.unb64() = Base64.decode(this, Base64.NO_WRAP)
@@ -190,6 +192,17 @@ class VybeSignalModule : Module() {
 
     /** Called when a friend reinstalls: drop the old session so the next send fetches a fresh bundle. */
     AsyncFunction("resetSession") { userId: String -> if (store.isRegistered) store.deleteAllSessions(userId) }
+
+    // Chat-backup key from the user's backup password: PBKDF2-HMAC-SHA256, 600k rounds (OWASP 2023), 256-bit.
+    // Native because it is ~1 s of CPU here and minutes in JS. Runs off the main thread (AsyncFunction).
+    AsyncFunction("deriveBackupKey") { password: String, saltB64: String ->
+      val spec = PBEKeySpec(password.toCharArray(), saltB64.unb64(), 600_000, 256)
+      try {
+        SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded.b64()
+      } finally {
+        spec.clearPassword()
+      }
+    }
 
     /** Sign-out / account deletion: destroys all keys and sessions on this device. */
     AsyncFunction("wipe") { store.wipe() }

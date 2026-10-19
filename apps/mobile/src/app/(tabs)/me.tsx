@@ -42,6 +42,7 @@ export default function MeScreen() {
       </Card>
       <SectionTitle>Account</SectionTitle>
       <Card style={{ paddingVertical: 0 }}>
+        {item('Chat backup', 'Keep your chats when you change phones', '/settings/backup', 'cloud-upload')}
         {item('Notifications', 'Choose what pings you', '/settings/notifications', 'notifications')}
         {item('Account security', 'Password and signed-in devices', '/settings/security', 'key')}
         {item('About & help', 'Support, legal, licenses', '/settings/about', 'information-circle')}

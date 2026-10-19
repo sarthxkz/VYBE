@@ -18,6 +18,7 @@ export default function SendPhoto() {
   const friends = useFriends();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [caption, setCaption] = useState('');
+  const [instant, setInstant] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mediaId, setMediaId] = useState<string | null>(null); // kept so a retry doesn't re-upload
@@ -35,7 +36,7 @@ export default function SendPhoto() {
     try {
       const id = mediaId ?? (await uploadImage({ uri, width: Number(w), height: Number(h) }, 'PHOTO', setProgress)).id;
       setMediaId(id);
-      await api('/photos', { body: { mediaId: id, caption: caption.trim() || undefined, recipientIds: [...selected] } });
+      await api('/photos', { body: { mediaId: id, caption: instant ? undefined : caption.trim() || undefined, recipientIds: [...selected], instant } });
       void qc.invalidateQueries({ queryKey: ['photos'] });
       router.replace('/photos');
     } catch (e) {
@@ -49,9 +50,18 @@ export default function SendPhoto() {
       <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.md, alignItems: 'center' }}>
         <Image source={{ uri }} style={{ width: 72, height: 96, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo to send" />
         <View style={{ flex: 1 }}>
-          <Input label="Caption (optional)" value={caption} onChangeText={setCaption} maxLength={200} />
+          {instant ? (
+            <Text muted>Blinks are just the moment: no caption.</Text>
+          ) : (
+            <Input label="Caption (optional)" value={caption} onChangeText={setCaption} maxLength={200} />
+          )}
         </View>
       </View>
+      <ListItem
+        title="✨ Send as a Blink"
+        subtitle="Each friend can open it once, then it’s gone. Unopened Blinks disappear after 24 hours."
+        right={<Switch value={instant} onValueChange={setInstant} accessibilityLabel="Send as a Blink" />}
+      />
       <Text variant="heading" style={{ marginBottom: space.sm }}>
         Send to
       </Text>

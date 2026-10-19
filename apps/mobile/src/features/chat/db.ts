@@ -119,6 +119,25 @@ export async function deleteConversation(peerId: string) {
   useChatVersion.getState().bump();
 }
 
+/** Everything, for the encrypted backup. */
+export async function allMessages() {
+  return (await chatDb()).getAllAsync<ChatMessage>('SELECT * FROM messages ORDER BY createdAt');
+}
+
+/** Restore from a backup: keeps anything already on this phone (same ids win locally). */
+export async function importMessages(list: ChatMessage[]) {
+  const db = await chatDb();
+  await db.withTransactionAsync(async () => {
+    for (const m of list) {
+      await db.runAsync(
+        'INSERT OR IGNORE INTO messages (id, peerId, fromMe, kind, body, replyTo, image, status, createdAt, deleted) VALUES (?,?,?,?,?,?,?,?,?,?)',
+        m.id, m.peerId, m.fromMe, m.kind, m.body, m.replyTo, m.image, m.status === 'sending' ? 'failed' : m.status, m.createdAt, m.deleted,
+      );
+    }
+  });
+  useChatVersion.getState().bump();
+}
+
 export async function kvGet(k: string) {
   return (await (await chatDb()).getFirstAsync<{ v: string }>('SELECT v FROM kv WHERE k = ?', k))?.v ?? null;
 }

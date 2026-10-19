@@ -7,7 +7,7 @@ import { api, mediaSource } from '@/api/client';
 import type { PhotoPost } from '@/api/types';
 import { ago } from '@/features/location/tracking';
 import { Avatar, Button, EmptyState, ErrorState, Pill, Row, Screen, Skeleton, Text } from '@/ui';
-import { radius, space, useColors } from '@/theme';
+import { palette, radius, space, useColors } from '@/theme';
 
 type Page = { items: PhotoPost[]; nextCursor: string | null };
 
@@ -77,13 +77,22 @@ export default function PhotosScreen() {
             onPress={() => router.push(`/photo/${item.id}`)}
             style={{ flex: 1, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: c.surfaceAlt, aspectRatio: 3 / 4 }}
           >
-            <Image source={mediaSource(item.mediaId)} style={{ flex: 1 }} contentFit="cover" transition={200} recyclingKey={item.id} />
+            {item.instant && tab === 'inbox' ? (
+              // Never preview a Blink: the only look is the one-time open.
+              <View style={{ flex: 1, backgroundColor: palette.grape500, alignItems: 'center', justifyContent: 'center', gap: space.xs }}>
+                <Text variant="title" color="#fff">✨</Text>
+                <Text variant="label" color="#fff">Blink · tap to open once</Text>
+              </View>
+            ) : (
+              <Image source={mediaSource(item.mediaId)} style={{ flex: 1 }} contentFit="cover" transition={200} recyclingKey={item.id} />
+            )}
             <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm }}>
               <Row gap={space.xs}>
                 <Avatar mediaId={item.sender.avatarMediaId} look={item.sender.avatarStyle} name={item.sender.displayName ?? item.sender.username} size={24} />
                 <Text variant="caption" color="#fff" numberOfLines={1} style={{ flex: 1, textShadowColor: '#000', textShadowRadius: 4 }}>
                   {ago(item.createdAt)}
                 </Text>
+                {item.instant && tab === 'sent' && <Pill label="✨ Blink" color={palette.grape500} textColor="#fff" />}
                 {tab === 'inbox' && !item.viewedAt && <Pill label="New" color={c.live} textColor="#14121F" />}
               </Row>
             </View>

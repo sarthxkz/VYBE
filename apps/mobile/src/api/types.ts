@@ -36,6 +36,9 @@ export type LocationSettings = { mode: SharingMode; ghost: boolean; expiresAt: s
 export type PhotoPost = {
   id: string;
   caption: string | null;
+  /** "Blink" in the app (API name: instant): opens once per friend, gone after viewing or at expiresAt (24 h). */
+  instant: boolean;
+  expiresAt: string | null;
   createdAt: string;
   mediaId: string;
   media: { width: number | null; height: number | null };

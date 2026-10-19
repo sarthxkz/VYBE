@@ -90,6 +90,7 @@ model User {
   reportsFiled      Report[]           @relation("Reporter")
   reportsAgainst    Report[]           @relation("ReportTarget")
   moderationActions ModerationAction[] @relation("ModTarget")
+  chatBackup        ChatBackup?
 
   @@map("users")
 }
@@ -277,6 +278,8 @@ model PhotoPost {
   senderId   String           @db.Uuid
   mediaId    String           @unique @db.Uuid
   caption    String?
+  instant    Boolean          @default(false) // view once, gone after opening or 24 h
+  expiresAt  DateTime?
   createdAt  DateTime         @default(now())
   sender     User             @relation(fields: [senderId], references: [id], onDelete: Cascade)
   media      MediaObject      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
@@ -385,4 +388,17 @@ model AuditEvent {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@map("audit_events")
+}
+
+/// The user's chat history, encrypted on their phone with a key derived from their backup password.
+/// The server stores ciphertext and the public salt only; it cannot read or verify the contents.
+model ChatBackup {
+  userId    String   @id @db.Uuid
+  salt      String
+  data      Bytes
+  size      Int
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_backups")
 }

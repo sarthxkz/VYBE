@@ -21,6 +21,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="delete-account" options={{ title: 'Delete account' }} />
       <Stack.Screen name="profile" options={{ title: 'Edit profile' }} />
       <Stack.Screen name="avatar" options={{ title: 'Your avatar' }} />
+      <Stack.Screen name="backup" options={{ title: 'Chat backup' }} />
       <Stack.Screen name="about" options={{ title: 'About Vybe' }} />
     </Stack>
   );

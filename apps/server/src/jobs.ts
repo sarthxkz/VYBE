@@ -1,6 +1,7 @@
 import { db } from './lib/db.js';
 import { logger } from './lib/logger.js';
-import { unlinkMedia } from './lib/media.js';
+import { deleteMedia, unlinkMedia } from './lib/media.js';
+import { INSTANT_VIEW_GRACE_MS } from './lib/authz.js';
 import { LOCATION_MAX_AGE_MS, withdrawLocation } from './modules/locations/routes.js';
 import { MESSAGE_TTL_MS } from './modules/messages/routes.js';
 
@@ -18,13 +19,28 @@ export async function runCleanup() {
 
   await db.encryptedMessage.deleteMany({ where: { createdAt: { lt: ago(MESSAGE_TTL_MS) } } });
 
-  // Media uploaded but never attached (abandoned uploads), and chat blobs past the message TTL.
+  // Instants: delete once expired, or once every recipient opened it (after the view grace period).
+  const instants = await db.photoPost.findMany({
+    where: {
+      instant: true,
+      OR: [
+        { expiresAt: { lt: new Date() } },
+        { recipients: { every: { viewedAt: { lt: ago(INSTANT_VIEW_GRACE_MS) } } } },
+      ],
+    },
+    select: { mediaId: true },
+    take: 1000,
+  });
+  if (instants.length) await deleteMedia(instants.map((p) => p.mediaId));
+
+  // Media uploaded but never attached (abandoned uploads). Chat images are kept (they're end-to-end encrypted)
+  // so a restored chat backup can still show them; only the two friends can fetch them, and they're deleted
+  // with the sender's account.
   const orphans = await db.mediaObject.findMany({
     where: {
       OR: [
         { kind: 'PHOTO', photoPost: null, createdAt: { lt: ago(24 * 3600_000) } },
         { kind: 'AVATAR', avatarOf: null, createdAt: { lt: ago(24 * 3600_000) } },
-        { kind: 'CHAT_BLOB', createdAt: { lt: ago(MESSAGE_TTL_MS) } },
       ],
     },
     select: { id: true },

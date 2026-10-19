@@ -38,4 +38,5 @@ export const rl = {
   message: make(60_000, 120, 'user'),
   report: make(60 * 60_000, 20, 'user'),
   clientError: make(60_000, 10, 'ip'),
+  backup: make(60 * 60_000, 30, 'user'),
 };
