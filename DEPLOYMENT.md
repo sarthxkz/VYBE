@@ -65,6 +65,9 @@ docker build -f Dockerfile.android --build-arg EXPO_PUBLIC_API_URL=https://api.1
 ```
 `dist/vybe-release.apk` is arm64-only and signed with a throwaway debug key: fine for side-loading tests. Play Store releases need your own upload keystore (never commit it).
 
+## App updates hosting
+Caddy serves `~/vybe/deploy/public` read-only: `/ota/...` (signed OTA manifests and content-addressed bundles/assets) and `/app/android/...` (APKs and `latest.json`). `apps/mobile/scripts/publish.mjs` uploads there over SSH, and the file clients poll moves into place last. The VM never holds a signing key. There's no directory listing; missing files return 404.
+
 ## Operations
 - **Logs:** `docker compose logs -f vybe-api` (structured JSON, secrets redacted).
 - **Restart policy:** `unless-stopped` on db and API; the API has a `/ready` health check.

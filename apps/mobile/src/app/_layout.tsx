@@ -13,6 +13,7 @@ import { useColors } from '@/theme';
 import { queryClient } from '@/lib/query';
 import { RealtimeBridge } from '@/features/RealtimeBridge';
 import { OfflineBanner } from '@/features/OfflineBanner';
+import { AppUpdateBanner } from '@/features/appUpdate';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -48,6 +49,7 @@ export default function RootLayout() {
         <StatusBar style="auto" />
         {signedIn && <RealtimeBridge />}
         <OfflineBanner />
+        <AppUpdateBanner />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
           <Stack.Protected guard={!signedIn}>
             <Stack.Protected guard={!introSeen}>

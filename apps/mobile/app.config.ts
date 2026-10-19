@@ -7,17 +7,23 @@ if (isRelease && (!apiUrl || !apiUrl.startsWith('https://'))) {
   throw new Error('Production builds require EXPO_PUBLIC_API_URL with https://');
 }
 
+// Bump VERSION (and android.versionCode) whenever native code changes: over-the-air updates only reach
+// APKs with the same runtime version, so a JS update can never land on incompatible native code.
+const VERSION = '0.1.0';
+const VERSION_CODE = 1;
+
 const config: ExpoConfig = {
   name: 'Vybe',
   slug: 'vybe',
   scheme: 'vybe',
-  version: '0.1.0',
+  version: VERSION,
+  runtimeVersion: VERSION,
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   android: {
     package: 'app.vybe',
-    versionCode: 1,
+    versionCode: VERSION_CODE,
     adaptiveIcon: {
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundColor: '#6C4CF5',
@@ -53,6 +59,7 @@ const config: ExpoConfig = {
     '@maplibre/maplibre-react-native',
     './plugins/withCoreLibraryDesugaring',
     './plugins/withCmakeVersion',
+    './plugins/withReleaseSigning',
     ...(process.env.GOOGLE_SERVICES_JSON ? ['@react-native-google-signin/google-signin'] : []),
     [
       'expo-build-properties',
@@ -67,6 +74,17 @@ const config: ExpoConfig = {
       },
     ],
   ],
+  // Self-hosted OTA (scripts/publish-update.mjs). Updates are signed on the developer machine; the app
+  // rejects any manifest not signed by the key behind certs/ota-certificate.pem, so the VM can't inject code.
+  updates: apiUrl?.startsWith('https://')
+    ? {
+        url: `${apiUrl}/ota/android/${VERSION}/manifest`,
+        checkAutomatically: 'ON_LOAD',
+        fallbackToCacheTimeout: 0,
+        codeSigningCertificate: './certs/ota-certificate.pem',
+        codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },
+      }
+    : { enabled: false },
   experiments: { typedRoutes: true },
   extra: {
     apiUrl: apiUrl ?? 'http://10.0.2.2:3000',

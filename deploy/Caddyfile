@@ -5,5 +5,31 @@
 		max_size 17MB
 	}
 	header -Server
-	reverse_proxy vybe-api:3000
+
+	# App updates: static files uploaded by apps/mobile/scripts/publish.mjs (signed on the developer machine).
+	handle /ota/* {
+		root * /srv/public
+		@manifest path */manifest
+		header @manifest {
+			Content-Type "multipart/mixed; boundary=vybe-ota"
+			expo-protocol-version 1
+			expo-sfv-version 0
+			Cache-Control "private, max-age=0"
+		}
+		header /ota/assets/* Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+	handle /app/* {
+		root * /srv/public
+		header /app/android/latest.json Cache-Control "no-cache"
+		header /app/android/*.apk {
+			Content-Type application/vnd.android.package-archive
+			Content-Disposition attachment
+		}
+		file_server
+	}
+
+	handle {
+		reverse_proxy vybe-api:3000
+	}
 }

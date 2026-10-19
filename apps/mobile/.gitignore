@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+dist-ota/
+dist-publish/
+dist-publish.tar
+!certs/ota-certificate.pem

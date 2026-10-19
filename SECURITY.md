@@ -22,6 +22,7 @@
 | **WebSocket abuse** | JWT on upgrade, 4 KB max frame, typing throttled 1/s and friend-only, no client-chosen subscriptions, heartbeat drops dead sockets. | — |
 | **Device compromise** | Signal state encrypted under a non-exportable Android Keystore AES key in `noBackupFilesDir`; chat DB is SQLCipher with a Keystore-protected key; `allowBackup=false`. | An unlocked, rooted device exposes decrypted history. |
 | **Server compromise** | Attacker gets metadata (who, when, friend graph, latest locations of sharers, photos) but not chat content or private keys. Backups are encrypted to an offline age key. | Photos are not E2EE (server-side private storage) — documented. |
+| **Malicious app update** | OTA manifests are RSA-signed on the release PC (`expo-updates` code signing); the app rejects unsigned or wrongly signed updates, so a compromised VM can't push JS. APKs are signed with a private release key; Android refuses updates signed by any other key. The in-app prompt only accepts APK URLs on our own https host. | Loss or theft of the release PC's keys (back them up offline). |
 | **Secrets in logs** | pino redaction of auth headers, passwords, tokens, ciphertext; URLs logged without query strings (app; Caddy keeps no access log); test asserts redaction. | — |
 | **SQL injection** | Prisma parameterized queries; the two raw queries use tagged templates (parameterized). | — |
 | **Dependency vulnerabilities** | `npm audit` in CI checklist; lockfiles committed; versions pinned to SDK-compatible ranges. | Transitive advisories in Expo tooling (dev-only). |

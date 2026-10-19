@@ -32,6 +32,25 @@ npx expo run:android               # builds the dev client and installs it on a 
 
 The emulator reaches your machine's API at `http://10.0.2.2:3000` (the default). For a physical phone, set `EXPO_PUBLIC_API_URL` to your machine's LAN address or the deployed HTTPS URL before building.
 
+## Releases & updates (Android)
+
+Two keys live **only on the release PC**, in `%USERPROFILE%\.vybe\`. Back up both, plus `%USERPROFILE%\.gradle\gradle.properties`, which holds the keystore password:
+- `vybe-release.jks`: the APK signing key. Android installs an update only if it's signed with the same key, so if you lose it, every user must uninstall and reinstall.
+- `ota-private-key.pem`: signs over-the-air updates. The app trusts only `apps/mobile/certs/ota-certificate.pem`, so a compromised server can't push code.
+
+**JS / asset change** (most changes): phones download it in the background and run it on the next launch.
+```bash
+cd apps/mobile && node scripts/publish.mjs ota
+```
+**Native change** (new native module, permission, SDK upgrade, `app.config.ts` plugins): bump `VERSION` and `VERSION_CODE` in `app.config.ts`, build, then publish. The app shows "Update available" and downloads the APK from the server.
+```bash
+cd apps/mobile
+APP_VARIANT=production EXPO_PUBLIC_API_URL=https://api.161-153-37-106.sslip.io npx expo prebuild -p android --clean
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a && cd ..
+node scripts/publish.mjs apk
+```
+OTA updates only reach APKs with the same `VERSION` (runtime version), so JS that needs new native code never lands on an old APK. After publishing a new APK, publish OTA updates for the new version.
+
 ## Tests
 
 ```bash

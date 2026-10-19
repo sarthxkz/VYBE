@@ -1,6 +1,7 @@
 # Release APK built on Linux (no Windows 260-char path limit). From apps/mobile:
 #   docker build -f Dockerfile.android --build-arg EXPO_PUBLIC_API_URL=https://api.example --output dist .
-# The APK lands in dist/. It is signed with a throwaway debug key: fine for testing, not for Play.
+# The APK lands in dist/ UNSIGNED (the release key stays on the developer PC; see README "Releases & updates").
+# Sign it with apksigner and ~/.vybe/vybe-release.jks before installing.
 FROM node:24-bookworm AS sdk
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-17-jdk-headless unzip && rm -rf /var/lib/apt/lists/*
 ENV ANDROID_HOME=/opt/android-sdk
@@ -27,4 +28,4 @@ RUN --mount=type=cache,target=/root/.gradle cd android \
 # ^ capped parallelism: Docker Desktop's default VM (half of a 16 GB host) hung at full parallelism.
 
 FROM scratch AS export
-COPY --from=build /app/android/app/build/outputs/apk/release/app-release.apk /vybe-release.apk
+COPY --from=build /app/android/app/build/outputs/apk/release/app-release-unsigned.apk /vybe-release-unsigned.apk
