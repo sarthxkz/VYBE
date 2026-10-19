@@ -1,0 +1,24 @@
+{
+  "name": "vybe",
+  "private": true,
+  "workspaces": [
+    "apps/server"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w apps/server",
+    "test": "npm test -w apps/server",
+    "typecheck": "npm run typecheck -w apps/server",
+    "lint": "npm run lint -w apps/server"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.1": true,
+    "@firebase/util": false,
+    "argon2": false,
+    "protobufjs": false
+  }
+}

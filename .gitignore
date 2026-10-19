@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+coverage/
+.media/
+apps/server/src/generated/
+# mobile
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/
+*.keystore
+*.jks
+google-services.json
+graphify-out/cache/

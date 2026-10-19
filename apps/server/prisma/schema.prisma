@@ -1,0 +1,384 @@
+// Vybe database schema. See DATABASE.md for design notes.
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum EmailTokenPurpose {
+  VERIFY
+  RESET
+}
+
+enum SharingMode {
+  OFF
+  ALL
+  SELECTED
+}
+
+enum MediaKind {
+  AVATAR
+  PHOTO
+  CHAT_BLOB
+}
+
+enum PreKeyKind {
+  EC
+  KYBER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+}
+
+/// Account + profile (merged: profile is always 1:1 and loaded with the user).
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String?
+  emailVerifiedAt DateTime?
+  googleSub       String?   @unique
+  role            Role      @default(USER)
+  suspendedAt     DateTime?
+  username        String?   @unique
+  displayName     String?
+  bio             String?
+  avatarMediaId   String?   @unique @db.Uuid
+  showPresence    Boolean   @default(true)
+  lastActiveAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  avatar            MediaObject?       @relation("Avatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  sessions          Session[]
+  emailTokens       EmailToken[]
+  device            Device?
+  sentRequests      FriendRequest[]    @relation("RequestFrom")
+  receivedRequests  FriendRequest[]    @relation("RequestTo")
+  friendshipsA      Friendship[]       @relation("FriendA")
+  friendshipsB      Friendship[]       @relation("FriendB")
+  blocking          Block[]            @relation("Blocker")
+  blockedBy         Block[]            @relation("Blocked")
+  locationSettings  LocationSettings?
+  grantsGiven       LocationGrant[]    @relation("GrantOwner")
+  grantsReceived    LocationGrant[]    @relation("GrantViewer")
+  currentLocation   CurrentLocation?
+  media             MediaObject[]      @relation("MediaOwner")
+  mediaAudience     MediaObject[]      @relation("MediaAudience")
+  photoPosts        PhotoPost[]
+  photoReceipts     PhotoRecipient[]
+  sentMessages      EncryptedMessage[] @relation("MsgSender")
+  receivedMessages  EncryptedMessage[] @relation("MsgRecipient")
+  chatMutes         ChatMute[]         @relation("MuteOwner")
+  mutedBy           ChatMute[]         @relation("MutePeer")
+  notificationPrefs NotificationPrefs?
+  reportsFiled      Report[]           @relation("Reporter")
+  reportsAgainst    Report[]           @relation("ReportTarget")
+  moderationActions ModerationAction[] @relation("ModTarget")
+
+  @@map("users")
+}
+
+/// One login on one app install. Push token lives here so logout stops pushes.
+model Session {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @db.Uuid
+  deviceName String?
+  pushToken  String?        @unique
+  createdAt  DateTime       @default(now())
+  lastUsedAt DateTime       @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh    RefreshToken[]
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// Every issued refresh token (hash only). A used token presented again means theft: the session is revoked.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  sessionId String    @db.Uuid
+  tokenHash String    @unique
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("refresh_tokens")
+}
+
+model EmailToken {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @db.Uuid
+  purpose   EmailTokenPurpose
+  codeHash  String
+  attempts  Int               @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("email_tokens")
+}
+
+/// The account's single E2EE device (v1: one device per account) and its public keys.
+model Device {
+  id                    String          @id @default(uuid()) @db.Uuid
+  userId                String          @unique @db.Uuid
+  registrationId        Int
+  identityKey           Bytes
+  signedPreKeyId        Int
+  signedPreKey          Bytes
+  signedPreKeySignature Bytes
+  kyberPreKeyId         Int
+  kyberPreKey           Bytes
+  kyberPreKeySignature  Bytes
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oneTimeKeys           OneTimePreKey[]
+
+  @@map("devices")
+}
+
+/// One-time prekeys; each is handed out at most once, then deleted.
+model OneTimePreKey {
+  id        String     @id @default(uuid()) @db.Uuid
+  deviceId  String     @db.Uuid
+  kind      PreKeyKind
+  keyId     Int
+  publicKey Bytes
+  signature Bytes?
+  device    Device     @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, kind, keyId])
+  @@map("one_time_prekeys")
+}
+
+/// Single pending request per unordered pair (pairKey = "minId:maxId") prevents duplicates and races.
+model FriendRequest {
+  id        String   @id @default(uuid()) @db.Uuid
+  fromId    String   @db.Uuid
+  toId      String   @db.Uuid
+  pairKey   String   @unique
+  createdAt DateTime @default(now())
+  from      User     @relation("RequestFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User     @relation("RequestTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@index([toId])
+  @@index([fromId])
+  @@map("friend_requests")
+}
+
+/// Stored once per pair with userAId < userBId.
+model Friendship {
+  userAId   String   @db.Uuid
+  userBId   String   @db.Uuid
+  createdAt DateTime @default(now())
+  userA     User     @relation("FriendA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("FriendB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@id([userAId, userBId])
+  @@index([userBId])
+  @@map("friendships")
+}
+
+model Block {
+  blockerId String   @db.Uuid
+  blockedId String   @db.Uuid
+  createdAt DateTime @default(now())
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+model LocationSettings {
+  userId    String      @id @db.Uuid
+  mode      SharingMode @default(OFF)
+  ghost     Boolean     @default(false)
+  /// Temporary sharing: sharing auto-stops after this instant (null = until turned off)
+  expiresAt DateTime?
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("location_sharing_settings")
+}
+
+/// Viewers allowed when mode = SELECTED.
+model LocationGrant {
+  ownerId  String @db.Uuid
+  viewerId String @db.Uuid
+  owner    User   @relation("GrantOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  viewer   User   @relation("GrantViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, viewerId])
+  @@index([viewerId])
+  @@map("location_sharing_grants")
+}
+
+/// Latest position only. No history is kept.
+model CurrentLocation {
+  userId     String   @id @db.Uuid
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  capturedAt DateTime
+  receivedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([receivedAt])
+  @@map("current_locations")
+}
+
+/// File bytes live at MEDIA_DIR/<id>; never under a public web root.
+model MediaObject {
+  id             String     @id @default(uuid()) @db.Uuid
+  ownerId        String     @db.Uuid
+  kind           MediaKind
+  mime           String
+  size           Int
+  width          Int?
+  height         Int?
+  /// For CHAT_BLOB: the only other user allowed to download the (ciphertext) blob
+  audienceUserId String?    @db.Uuid
+  createdAt      DateTime   @default(now())
+  owner          User       @relation("MediaOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  audience       User?      @relation("MediaAudience", fields: [audienceUserId], references: [id], onDelete: Cascade)
+  avatarOf       User?      @relation("Avatar")
+  photoPost      PhotoPost?
+
+  @@index([ownerId])
+  @@map("media_objects")
+}
+
+model PhotoPost {
+  id         String           @id @default(uuid()) @db.Uuid
+  senderId   String           @db.Uuid
+  mediaId    String           @unique @db.Uuid
+  caption    String?
+  createdAt  DateTime         @default(now())
+  sender     User             @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  media      MediaObject      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  recipients PhotoRecipient[]
+  reports    Report[]
+
+  @@index([senderId, createdAt])
+  @@map("photo_posts")
+}
+
+model PhotoRecipient {
+  postId      String    @db.Uuid
+  recipientId String    @db.Uuid
+  viewedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  post        PhotoPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  recipient   User      @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@id([postId, recipientId])
+  @@index([recipientId, createdAt])
+  @@map("photo_recipients")
+}
+
+/// Ciphertext awaiting delivery. Deleted when the recipient acks it (store-and-forward only).
+model EncryptedMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  senderId    String   @db.Uuid
+  recipientId String   @db.Uuid
+  clientMsgId String   @db.Uuid
+  /// libsignal CiphertextMessageType (2 = whisper, 3 = prekey)
+  type        Int
+  ciphertext  Bytes
+  createdAt   DateTime @default(now())
+  sender      User     @relation("MsgSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User     @relation("MsgRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, clientMsgId])
+  @@index([recipientId, createdAt])
+  @@map("encrypted_messages")
+}
+
+/// Server-side mute, needed so muted chats do not trigger push.
+model ChatMute {
+  userId String    @db.Uuid
+  peerId String    @db.Uuid
+  until  DateTime?
+  user   User      @relation("MuteOwner", fields: [userId], references: [id], onDelete: Cascade)
+  peer   User      @relation("MutePeer", fields: [peerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, peerId])
+  @@map("chat_mutes")
+}
+
+model NotificationPrefs {
+  userId         String  @id @db.Uuid
+  friendRequests Boolean @default(true)
+  photos         Boolean @default(true)
+  messages       Boolean @default(true)
+  security       Boolean @default(true)
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model Report {
+  id           String             @id @default(uuid()) @db.Uuid
+  reporterId   String?            @db.Uuid
+  targetUserId String             @db.Uuid
+  photoPostId  String?            @db.Uuid
+  reason       String
+  details      String?
+  status       ReportStatus       @default(OPEN)
+  createdAt    DateTime           @default(now())
+  reporter     User?              @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  target       User               @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  photoPost    PhotoPost?         @relation(fields: [photoPostId], references: [id], onDelete: SetNull)
+  actions      ModerationAction[]
+
+  @@index([status, createdAt])
+  @@map("reports")
+}
+
+model ModerationAction {
+  id           String   @id @default(uuid()) @db.Uuid
+  reportId     String?  @db.Uuid
+  targetUserId String   @db.Uuid
+  actorId      String?  @db.Uuid
+  action       String
+  note         String?
+  createdAt    DateTime @default(now())
+  report       Report?  @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  target       User     @relation("ModTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@map("moderation_actions")
+}
+
+/// Security-relevant events. No FK, so the record of an account deletion survives (userId is nulled on deletion).
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  type      String
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("audit_events")
+}
