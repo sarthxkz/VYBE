@@ -24,7 +24,9 @@ Health: `GET /health` (process up), `GET /ready` (DB reachable). Both are unauth
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/me` | Profile, email, `hasPassword`, `hasGoogle` |
-| PATCH | `/me` | `{username?, displayName?, bio?, avatarMediaId?, showPresence?}` (strict: unknown fields rejected). `409 USERNAME_TAKEN` |
+| PATCH | `/me` | `{username?, displayName?, bio?, avatarMediaId?, avatarStyle?, showPresence?}` (strict: unknown fields rejected). `avatarStyle` is `{skin, face, hair, hairColor, eyes, mouth, accessory, outfit}` as integer part indexes (range-checked) or `null`. `409 USERNAME_TAKEN` |
+| PUT | `/me/mood` | `{emoji, text?}`: exactly one emoji, text ≤ 40. Friends see it for 24 h (`mood` on `/friends`, `/locations/friends`, `/users/:id` when friends); never in search. Emits `friend:mood` to friends. |
+| DELETE | `/me/mood` | Clears it |
 | GET | `/username-available?username=` | |
 | PUT | `/me/push-token` | `{token \| null}`. Bound to this session. |
 | GET/PUT | `/me/notifications` | `{friendRequests, photos, messages, security}` |

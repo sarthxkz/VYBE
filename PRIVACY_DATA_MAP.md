@@ -6,6 +6,10 @@
 | Password hash (argon2id) | Sign-up / reset | Authentication | Nobody (one-way) | `users` | Life of account | Deleted |
 | Google account id (`sub`) | Google sign-in | Authentication | Service | `users` | Life of account | Deleted |
 | Username, display name, bio, avatar | Profile setup | Discovery, display | Signed-in users except blocked | `users`, media disk | Until changed | Deleted (avatar file unlinked) |
+| Illustrated avatar style (part indexes) | User designs it | Display | Signed-in users except blocked | `users.avatarStyle` | Until changed | Deleted |
+| Mood (one emoji + up to 40 characters) | User sets it | Show friends your vibe | **Friends only**; hidden after 24 h | `users.mood*` | Overwritten or cleared; hidden after 24 h | Deleted |
+| Contacts | **Not collected.** Read on the phone only when you choose to invite someone | Pick who to text an invite | Nobody else | Never leaves the phone | n/a | n/a |
+| "Friend nearby" alerts | While sharing location | Notify you when a friend you can already see is within 250 m | Only you; computed on your phone | Device file (`nearby.json`: friend ids, near/far, time) | Until uninstall | Removed with the app |
 | Presence / last active | While app connected | Show online status | Friends, only if `showPresence` | memory, `users.lastActiveAt` | Overwritten | Deleted |
 | Friend requests, friendships, blocks | User actions | Social graph, authorization | Parties involved | DB | Until changed | Deleted |
 | Location settings, grants | User choice | Sharing policy | User | DB | Until changed | Deleted |
