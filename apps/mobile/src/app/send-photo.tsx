@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { errorText } from '@/copy';
+import { BlinkIntro, shouldIntroduceBlink } from '@/features/BlinkIntro';
 import { useFriends } from '@/features/friends/hooks';
 import { uploadImage } from '@/lib/images';
 import { Avatar, Button, EmptyState, Input, ListItem, Screen, Text } from '@/ui';
@@ -19,6 +20,11 @@ export default function SendPhoto() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [caption, setCaption] = useState('');
   const [instant, setInstant] = useState(false);
+  const [introBlink, setIntroBlink] = useState(false);
+  const pickBlink = async (on: boolean) => {
+    setInstant(on);
+    if (on && (await shouldIntroduceBlink())) setIntroBlink(true);
+  };
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mediaId, setMediaId] = useState<string | null>(null); // kept so a retry doesn't re-upload
@@ -60,7 +66,7 @@ export default function SendPhoto() {
       <ListItem
         title="✨ Send as a Blink"
         subtitle="Each friend can open it once, then it’s gone. Unopened Blinks disappear after 24 hours."
-        right={<Switch value={instant} onValueChange={setInstant} accessibilityLabel="Send as a Blink" />}
+        right={<Switch value={instant} onValueChange={pickBlink} accessibilityLabel="Send as a Blink" />}
       />
       <Text variant="heading" style={{ marginBottom: space.sm }}>
         Send to
@@ -96,6 +102,13 @@ export default function SendPhoto() {
         loading={progress !== null}
         onPress={send}
         style={{ marginVertical: space.md }}
+      />
+      <BlinkIntro
+        visible={introBlink}
+        onDone={(keep) => {
+          setIntroBlink(false);
+          setInstant(keep);
+        }}
       />
     </Screen>
   );
