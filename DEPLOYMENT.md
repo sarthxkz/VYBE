@@ -32,7 +32,7 @@ ssh -i ~/.ssh/bunkr_oracle sarthak@161.153.37.106 'cd ~/vybe/deploy && ./setup.s
 `setup.sh` is idempotent. It writes `deploy/.env` (mode 600, random DB password and `JWT_SECRET`; it never leaves the VM) and runs `docker compose up -d --build`. Caddy obtains the certificate on first start.
 
 Then:
-1. **SMTP (required for sign-up):** set `SMTP_URL` (e.g. `smtps://user:pass@smtp.provider.com:465`) and `MAIL_FROM` in `~/vybe/deploy/.env`, then run `docker compose up -d`. Without it, verification codes aren't sent (the logs say so) and new accounts can't verify.
+1. **SMTP (required for sign-up):** set `SMTP_URL` (e.g. `smtps://user:pass@smtp.provider.com:465`) and `MAIL_FROM` in `~/vybe/deploy/.env`, then run `docker compose up -d`. **Gmail:** use an [app password](https://myaccount.google.com/apppasswords) (needs 2-Step Verification). The URL is `smtps://you%40gmail.com:<app-password-without-spaces>@smtp.gmail.com:465`, and `MAIL_FROM` must be that same address. Gmail caps sending at about 500 emails a day; move to a transactional provider before launch. Without it, verification codes aren't sent (the logs say so) and new accounts can't verify.
 2. **Backups key:** on your own computer, run `age-keygen -o vybe-backup.key` and keep the key offline. On the VM: `mkdir -p ~/.config/vybe ~/bin`, put the `age1…` public key in `~/.config/vybe/backup-recipients.txt`, and install the `age` linux-arm64 binary to `~/bin/age` from https://github.com/FiloSottile/age/releases. Add the cron line from `backup.sh`.
 3. Optional: `GOOGLE_CLIENT_IDS`. For push, mount a service-account JSON and set `FCM_SERVICE_ACCOUNT_PATH`.
 
