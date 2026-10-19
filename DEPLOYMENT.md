@@ -14,7 +14,7 @@ Internet ──443/80──► caddy (TLS, auto-renew) ──edge net──► v
 ## 0. Inspection (2026-10-19, read-only)
 - User `sarthak` (groups: sudo, docker). `sudo` asks for a password.
 - Host firewall (iptables, Oracle default; no ufw): INPUT allows 22, 80, 443, ICMP and loopback, and REJECTs everything else. Docker-published ports bypass INPUT, and only Caddy publishes any (80/443).
-- The VM previously ran Bunkr behind its own Caddy. **Bunkr was removed on 2026-10-19** at your request (containers, volumes, network, image, `~/bunkr`). Its data and secret key are archived at `~/bunkr-final-backup-20261019.tar.gz` (mode 600); delete that file when you no longer need it.
+- The VM previously ran Bunkr behind its own Caddy. **Bunkr was removed on 2026-10-19** at your request (containers, volumes, network, image, `~/bunkr`). Its final backup was deleted too, so no Bunkr data remains.
 - Listening: 22, 80, 443 (Caddy via docker-proxy), 111 (rpcbind), 53 (localhost resolver). From outside: **22, 80, 443 open; 111, 3000, 5432, 2019 filtered.**
 - No Node, Postgres or nginx on the host; Docker 29.9.1 and git present. Disk 193 GB, 5% used.
 
