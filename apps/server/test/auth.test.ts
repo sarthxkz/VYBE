@@ -70,7 +70,12 @@ describe('login and sessions', () => {
     const u = await makeUser();
     const r1 = await api().post('/v1/auth/refresh').send({ refreshToken: u.refreshToken }).expect(200);
     expect(r1.body.refreshToken).not.toBe(u.refreshToken);
-    // Replay of the first token = theft signal.
+    // An immediate replay looks like two app runtimes racing: refused, session kept.
+    const race = await api().post('/v1/auth/refresh').send({ refreshToken: u.refreshToken }).expect(401);
+    expect(race.body.error.code).toBe('REFRESH_RACE');
+    await api().get('/v1/me').set({ Authorization: `Bearer ${r1.body.accessToken}` }).expect(200);
+    // A replay after the grace window = theft signal.
+    await db.refreshToken.updateMany({ where: { usedAt: { not: null } }, data: { usedAt: new Date(Date.now() - 60_000) } });
     const replay = await api().post('/v1/auth/refresh').send({ refreshToken: u.refreshToken }).expect(401);
     expect(replay.body.error.code).toBe('REFRESH_REUSED');
     // The legitimately rotated token is now dead too, and so is the access token.

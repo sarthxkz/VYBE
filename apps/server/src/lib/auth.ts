@@ -1,4 +1,4 @@
-﻿import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import type { RequestHandler } from 'express';
 import argon2 from 'argon2';
 import { SignJWT, jwtVerify } from 'jose';
@@ -9,6 +9,7 @@ import { forbidden, unauthorized } from './errors.js';
 const secret = new TextEncoder().encode(config.JWT_SECRET);
 export const ACCESS_TTL_SEC = 15 * 60;
 export const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
+const REFRESH_RACE_GRACE_MS = 30_000;
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -111,6 +112,9 @@ export async function rotateRefresh(refreshToken: string) {
     if (!row) return { error: 'INVALID_REFRESH' as const };
     const s = row.session;
     if (row.usedAt) {
+      // Two runtimes on one phone (app + headless location task) can refresh at the same moment.
+      // A replay within the grace window is refused but not treated as theft.
+      if (Date.now() - row.usedAt.getTime() < REFRESH_RACE_GRACE_MS) return { error: 'REFRESH_RACE' as const };
       await tx.session.update({ where: { id: s.id }, data: { revokedAt: s.revokedAt ?? new Date() } });
       return { error: 'REFRESH_REUSED' as const, userId: s.userId };
     }

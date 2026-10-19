@@ -20,5 +20,6 @@
     "@firebase/util": false,
     "argon2": false,
     "protobufjs": false
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

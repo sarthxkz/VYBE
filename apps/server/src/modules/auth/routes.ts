@@ -8,6 +8,7 @@ import { badRequest, forbidden, notFound, parse, unauthorized } from '../../lib/
 import { sendMail } from '../../lib/mail.js';
 import { rl } from '../../lib/rateLimit.js';
 import { disconnect } from '../../realtime.js';
+import { push } from '../../lib/push.js';
 import {
   burnPasswordCheck,
   hashPassword,
@@ -141,7 +142,10 @@ authRouter.post('/refresh', rl.authIp, async (req, res) => {
   const body = parse(z.object({ refreshToken: z.string().min(20).max(200) }), req.body);
   const r = await rotateRefresh(body.refreshToken);
   if ('error' in r) {
-    if (r.error === 'REFRESH_REUSED') audit('auth.refresh_reuse_detected', r.userId ?? null, req);
+    if (r.error === 'REFRESH_REUSED') {
+      audit('auth.refresh_reuse_detected', r.userId ?? null, req);
+      if (r.userId) void push(r.userId, 'security', { type: 'session_revoked' });
+    }
     throw unauthorized(r.error);
   }
   res.json(r);
@@ -167,6 +171,7 @@ authRouter.post('/reset-password', rl.authIp, rl.codeEmail, async (req, res) => 
   await revokeAllSessions(user.id);
   disconnect(user.id);
   audit('auth.password_reset', user.id, req);
+  void push(user.id, 'security', { type: 'password_reset' });
   await sendMail(user.email, 'Your Vybe password was changed', 'Your password was reset and all devices were signed out. If this was not you, reset it again and contact support.');
   res.json({ ok: true });
 });
@@ -187,6 +192,7 @@ authRouter.post('/change-password', async (req, res) => {
   // Keep this session, end every other one.
   await db.session.updateMany({ where: { userId: user.id, revokedAt: null, id: { not: req.user!.sid } }, data: { revokedAt: new Date(), pushToken: null } });
   audit('auth.password_changed', user.id, req);
+  void push(user.id, 'security', { type: 'password_changed' });
   res.json({ ok: true });
 });
 

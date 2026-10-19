@@ -1,4 +1,4 @@
-﻿// Public-key directory for the Signal protocol. Only PUBLIC keys and signatures ever reach the server.
+// Public-key directory for the Signal protocol. Only PUBLIC keys and signatures ever reach the server.
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../../lib/db.js';

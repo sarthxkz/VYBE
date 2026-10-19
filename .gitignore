@@ -14,4 +14,8 @@ apps/mobile/ios/
 *.keystore
 *.jks
 google-services.json
-graphify-out/cache/
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
+apps/mobile/build-debug.log
+apps/mobile/modules/*/android/build/
+apps/graphify-out/

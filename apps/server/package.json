@@ -12,7 +12,6 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx --env-file=../../.env prisma/seed.ts",
     "postinstall": "prisma generate"
   },
   "devDependencies": {
@@ -51,5 +50,6 @@
     "sharp": "^0.35.5",
     "ws": "^8.22.0",
     "zod": "^4.3.6"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }
