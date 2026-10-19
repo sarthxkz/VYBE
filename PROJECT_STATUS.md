@@ -23,10 +23,14 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - Android `assembleDebug` (JDK 25 + Gradle 9.4.1 work): all Kotlin compiles, **including the `vybe-signal` module against libsignal-android 0.105.1** (compiled classes produced). The build then **fails at the C++ step on Windows**: ninja 1.10 (bundled with SDK CMake 3.22.1) can't stat the react-native-gesture-handler codegen object path (>260 chars), and `LongPathsEnabled=0` on this PC. `subst` and `CMAKE_OBJECT_PATH_MAX` didn't help. **No APK yet.** Fix options are listed under blockers.
 - graphify (AST, 110 code files → 790 nodes, 37 communities): **no import cycles**; every resource route module imports both `requireAuth` and `authz.ts`. Report: `graphify-out/GRAPH_REPORT.md`.
 
+## First release APK (2026-10-20)
+- Built natively on Windows (long paths on, SDK CMake 4.1.2) in 40 min: `assembleRelease`, arm64-v8a, **signed with the private release key** (cert SHA-256 `9d5d4bff…46ee65ac`, verified with apksigner). Contains `libsignal_jni.so`, MapLibre, expo-sqlite (SQLCipher) and the Hermes bundle.
+- Published: https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.0-1.apk (`latest.json` versionCode 1). The download was verified from the VM (200, full 76 MB, correct content type).
+- Self-hosted OTA (code-signed) and the in-app APK update prompt are built in. **Not yet exercised on a phone.**
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
-| Windows long-path build fix | First APK | Either enable long paths (admin) so a newer ninja can be used, build in a Docker Linux container, or use EAS cloud build |
 | Firebase project | Push notifications, Google sign-in | `google-services.json`, service-account JSON, OAuth web client ID |
 | age key pair | Encrypted backups | Public key in `~/.config/vybe/backup-recipients.txt` on the VM; private key kept offline |
 | Physical Android phone (USB debugging) | Background location cadence, camera, FCM, Keystore, E2EE on device | — |
