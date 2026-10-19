@@ -10,7 +10,7 @@ Android app (Expo dev build)
  └─ FCM token ──► PUT /v1/me/push-token
           │ HTTPS / WSS (443)
           ▼
-Caddy (TLS, shared with Bunkr on the VM, no access logs)
+Caddy (TLS, auto-renew, no access logs)
           │ 127.0.0.1:3000
           ▼
 Express 5 API + ws (single Node process, Docker container)

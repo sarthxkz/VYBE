@@ -1,19 +1,20 @@
 # Deployment: Oracle Cloud VM (Ubuntu 24.04, arm64)
 
-Target: VM `161.153.37.106` (2 Ampere cores, 11 GB RAM), hostname **`api.161-153-37-106.sslip.io`** (sslip.io resolves it to the IP, and Let's Encrypt issues a normal cert). The VM already runs **Bunkr** (`~/bunkr`), whose Caddy container owns ports 80/443, so Vybe runs as a Docker Compose project behind that Caddy. No `sudo` is needed: the deploy user is in the `docker` group.
+Target: VM `161.153.37.106` (2 Ampere cores, 11 GB RAM), hostname **`api.161-153-37-106.sslip.io`** (sslip.io resolves it to the IP, and Let's Encrypt issues a normal cert). Vybe runs as one Docker Compose project, and its Caddy owns ports 80/443. No `sudo` is needed because the deploy user is in the `docker` group.
 
 ```
-Internet ──443/80──► Bunkr's Caddy (TLS, auto-renew) ─┬─► bunkr api:3000                 (161.153.37.106.sslip.io)
-                                                     └─► vybe-api:3000 ──internal net──► db (Postgres 17)
-                         network: deploy_default               │                        volume vybe_db-data
-                                                               └─ volume vybe_media (/data/media, 0700)
+Internet ──443/80──► caddy (TLS, auto-renew) ──edge net──► vybe-api:3000 ──internal net──► db (Postgres 17)
+                                                                  │                       volume vybe_db-data
+                                                                  └─ volume vybe_media (/data/media, 0700)
 ```
-- `db` sits only on an `internal: true` network: no published port, no route to the internet.
-- `vybe-api` publishes no port; only Caddy reaches it over Bunkr's `deploy_default` network. The service is deliberately **not** named `api`, which would collide with Bunkr's `api` alias on that network.
+- `db` sits only on an `internal: true` network, with no published port and no route to the internet.
+- `vybe-api` publishes no port. Caddy reaches it over the `edge` network, which is also the API's route out to SMTP, FCM and Google.
 - Migrations run as a one-shot `migrate` container (the build stage, which has the Prisma CLI) before the API starts.
 
 ## 0. Inspection (2026-10-19, read-only)
-- User `sarthak` (groups: sudo, docker). `sudo` asks for a password, so host firewall rules (ufw/iptables) could not be read.
+- User `sarthak` (groups: sudo, docker). `sudo` asks for a password.
+- Host firewall (iptables, Oracle default; no ufw): INPUT allows 22, 80, 443, ICMP and loopback, and REJECTs everything else. Docker-published ports bypass INPUT, and only Caddy publishes any (80/443).
+- The VM previously ran Bunkr behind its own Caddy. **Bunkr was removed on 2026-10-19** at your request (containers, volumes, network, image, `~/bunkr`). Its data and secret key are archived at `~/bunkr-final-backup-20261019.tar.gz` (mode 600); delete that file when you no longer need it.
 - Listening: 22, 80, 443 (Caddy via docker-proxy), 111 (rpcbind), 53 (localhost resolver). From outside: **22, 80, 443 open; 111, 3000, 5432, 2019 filtered.**
 - No Node, Postgres or nginx on the host; Docker 29.9.1 and git present. Disk 193 GB, 5% used.
 
@@ -28,9 +29,7 @@ From your PC (the repo has no remote; this ships the committed tree):
 git archive --format=tar HEAD | ssh -i ~/.ssh/bunkr_oracle sarthak@161.153.37.106 'mkdir -p ~/vybe && tar -x -C ~/vybe'
 ssh -i ~/.ssh/bunkr_oracle sarthak@161.153.37.106 'cd ~/vybe/deploy && ./setup.sh'
 ```
-`setup.sh` is idempotent. It writes `deploy/.env` (mode 600, random DB password and `JWT_SECRET`, never leaves the VM), runs `docker compose up -d --build`, appends `Caddyfile.vybe` to Bunkr's `~/bunkr/deploy/Caddyfile`, validates the config and reloads Caddy in place. Bunkr keeps running throughout.
-
-> If you redeploy Bunkr from its tarball, its Caddyfile is replaced. Re-run `./setup.sh` afterwards to add the Vybe block again.
+`setup.sh` is idempotent. It writes `deploy/.env` (mode 600, random DB password and `JWT_SECRET`; it never leaves the VM) and runs `docker compose up -d --build`. Caddy obtains the certificate on first start.
 
 Then:
 1. **SMTP (required for sign-up):** set `SMTP_URL` (e.g. `smtps://user:pass@smtp.provider.com:465`) and `MAIL_FROM` in `~/vybe/deploy/.env`, then run `docker compose up -d`. Without it, verification codes aren't sent (the logs say so) and new accounts can't verify.
@@ -49,7 +48,7 @@ On the VM:
 ```bash
 cd ~/vybe/deploy && docker compose ps            # db healthy, migrate exited 0, vybe-api healthy
 docker compose logs --tail 50 vybe-api
-docker port vybe-vybe-api-1; docker port vybe-db-1   # both print nothing: no published ports
+docker port vybe-vybe-api-1; docker port vybe-db-1   # both print nothing: only caddy publishes 80/443
 ```
 From **outside**:
 ```bash

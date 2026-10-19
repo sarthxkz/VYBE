@@ -1,0 +1,9 @@
+# HTTPS for the Vybe API. Caddy gets and renews the certificate itself (Let's Encrypt); WebSockets pass through.
+{$PUBLIC_HOST} {
+	encode gzip
+	request_body {
+		max_size 17MB
+	}
+	header -Server
+	reverse_proxy vybe-api:3000
+}
