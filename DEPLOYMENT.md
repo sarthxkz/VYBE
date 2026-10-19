@@ -1,94 +1,82 @@
-# Deployment: Oracle Cloud VM (Ubuntu)
+# Deployment: Oracle Cloud VM (Ubuntu 24.04, arm64)
 
-Target: VM `161.153.37.106`, hostname **`api.161-153-37-106.sslip.io`** (sslip.io resolves it to the IP, and Let's Encrypt issues a normal cert). To use a real domain later, change `PUBLIC_HOST`, re-run certbot, and rebuild the app with the new `EXPO_PUBLIC_API_URL`.
+Target: VM `161.153.37.106` (2 Ampere cores, 11 GB RAM), hostname **`api.161-153-37-106.sslip.io`** (sslip.io resolves it to the IP, and Let's Encrypt issues a normal cert). The VM already runs **Bunkr** (`~/bunkr`), whose Caddy container owns ports 80/443, so Vybe runs as a Docker Compose project behind that Caddy. No `sudo` is needed: the deploy user is in the `docker` group.
 
 ```
-Internet ──443/80──► nginx (TLS, rate limit) ──127.0.0.1:3000──► vybe-api (systemd, user vybe)
-                                                                  ├─ PostgreSQL 17 (localhost:5432)
-SSH 22 ◄── admin IP only                                          └─ /var/lib/vybe/media (0700)
+Internet ──443/80──► Bunkr's Caddy (TLS, auto-renew) ─┬─► bunkr api:3000                 (161.153.37.106.sslip.io)
+                                                     └─► vybe-api:3000 ──internal net──► db (Postgres 17)
+                         network: deploy_default               │                        volume vybe_db-data
+                                                               └─ volume vybe_media (/data/media, 0700)
 ```
+- `db` sits only on an `internal: true` network: no published port, no route to the internet.
+- `vybe-api` publishes no port; only Caddy reaches it over Bunkr's `deploy_default` network. The service is deliberately **not** named `api`, which would collide with Bunkr's `api` alias on that network.
+- Migrations run as a one-shot `migrate` container (the build stage, which has the Prisma CLI) before the API starts.
 
-## 0. Inspect first (read-only)
-Check what's already on the box before changing anything:
-```bash
-ssh -i ~/.ssh/bunkr_oracle <user>@161.153.37.106
-sudo ss -tlnp                     # listening services/ports
-sudo ufw status verbose
-sudo iptables -S | head -50       # Oracle images ship their own rules
-cat /etc/iptables/rules.v4 | head -50
-systemctl list-units --type=service --state=running
-df -h; free -m; lsb_release -a
-```
-**Oracle Ubuntu images** include `iptables` rules (`/etc/iptables/rules.v4`, loaded by `netfilter-persistent`) that `REJECT` everything except SSH. Either:
-- **Keep iptables** and add rules for 80/443 *above* the final REJECT: `sudo iptables -I INPUT 6 -p tcp -m multiport --dports 80,443 -m state --state NEW -j ACCEPT && sudo netfilter-persistent save`, and skip UFW; or
-- **Switch to UFW**: `sudo apt purge netfilter-persistent iptables-persistent` (after confirming you won't lock yourself out), then let `setup-vm.sh` configure UFW.
+## 0. Inspection (2026-10-19, read-only)
+- User `sarthak` (groups: sudo, docker). `sudo` asks for a password, so host firewall rules (ufw/iptables) could not be read.
+- Listening: 22, 80, 443 (Caddy via docker-proxy), 111 (rpcbind), 53 (localhost resolver). From outside: **22, 80, 443 open; 111, 3000, 5432, 2019 filtered.**
+- No Node, Postgres or nginx on the host; Docker 29.9.1 and git present. Disk 193 GB, 5% used.
 
-Pick one firewall manager. Don't run both.
+Recommended (needs sudo, your call): `sudo systemctl disable --now rpcbind rpcbind.socket`. It's filtered from outside today, but nothing here needs it.
 
 ## 1. OCI network (console)
-VCN → Security List (or NSG) for the VM's subnet. **Ingress:**
-| Source | Protocol/Port | Why |
-|---|---|---|
-| `<your IP>/32` | TCP 22 | SSH (admin only) |
-| `0.0.0.0/0` | TCP 80 | ACME challenge + redirect |
-| `0.0.0.0/0` | TCP 443 | HTTPS + WSS |
+VCN → Security List (or NSG) for the VM's subnet. **Ingress:** TCP 22 from `<your IP>/32` only, TCP 80 and 443 from `0.0.0.0/0`. **Never** add 3000 or 5432. Remove any default `0.0.0.0/0 → 22` once your admin rule works.
 
-Remove any default `0.0.0.0/0 → 22` rule once your admin rule works. **Never** add 3000, 5432 or 6379.
-
-## 2. Provision
+## 2. First deploy
+From your PC (the repo has no remote; this ships the committed tree):
 ```bash
-sudo mkdir -p /opt/vybe && sudo chown $USER /opt/vybe
-git clone <repo-url> /opt/vybe
-cd /opt/vybe
-sudo PUBLIC_HOST=api.161-153-37-106.sslip.io ADMIN_IP=<your.ip>/32 LE_EMAIL=<you@example.com> ./deploy/setup-vm.sh
+git archive --format=tar HEAD | ssh -i ~/.ssh/bunkr_oracle sarthak@161.153.37.106 'mkdir -p ~/vybe && tar -x -C ~/vybe'
+ssh -i ~/.ssh/bunkr_oracle sarthak@161.153.37.106 'cd ~/vybe/deploy && ./setup.sh'
 ```
-This installs Postgres 17 (localhost only, scram auth), Node 24, nginx, certbot, age; creates the `vybe` system user, a least-privilege DB role with a random password, `/etc/vybe/vybe.env` (mode 640) with a fresh `JWT_SECRET`; configures UFW, nginx and TLS (with auto-renewal); and installs the systemd units.
+`setup.sh` is idempotent. It writes `deploy/.env` (mode 600, random DB password and `JWT_SECRET`, never leaves the VM), runs `docker compose up -d --build`, appends `Caddyfile.vybe` to Bunkr's `~/bunkr/deploy/Caddyfile`, validates the config and reloads Caddy in place. Bunkr keeps running throughout.
+
+> If you redeploy Bunkr from its tarball, its Caddyfile is replaced. Re-run `./setup.sh` afterwards to add the Vybe block again.
 
 Then:
-1. **Backups key:** on your own computer, `age-keygen -o vybe-backup.key` (keep it offline). Put the `# public key: age1…` value in `/etc/vybe/backup-recipients.txt` on the VM.
-2. **SMTP:** set `SMTP_URL` (e.g. `smtps://user:pass@smtp.provider.com:465`) and `MAIL_FROM` in `/etc/vybe/vybe.env`. Without it, verification codes are not sent (the logs say so).
-3. Optional: `GOOGLE_CLIENT_IDS`, and `FCM_SERVICE_ACCOUNT_PATH=/etc/vybe/fcm.json` (mode 640, group vybe).
+1. **SMTP (required for sign-up):** set `SMTP_URL` (e.g. `smtps://user:pass@smtp.provider.com:465`) and `MAIL_FROM` in `~/vybe/deploy/.env`, then run `docker compose up -d`. Without it, verification codes aren't sent (the logs say so) and new accounts can't verify.
+2. **Backups key:** on your own computer, run `age-keygen -o vybe-backup.key` and keep the key offline. On the VM: `mkdir -p ~/.config/vybe ~/bin`, put the `age1…` public key in `~/.config/vybe/backup-recipients.txt`, and install the `age` linux-arm64 binary to `~/bin/age` from https://github.com/FiloSottile/age/releases. Add the cron line from `backup.sh`.
+3. Optional: `GOOGLE_CLIENT_IDS`. For push, mount a service-account JSON and set `FCM_SERVICE_ACCOUNT_PATH`.
 
-## 3. Deploy / update
+## 3. Update / rollback
 ```bash
-sudo -u vybe git -C /opt/vybe pull
-sudo /opt/vybe/deploy/deploy.sh      # backup → npm ci → build → migrate deploy → restart → /ready check
+git archive --format=tar HEAD | ssh … 'tar -x -C ~/vybe'
+ssh … 'cd ~/vybe/deploy && ./backup.sh && docker compose up -d --build'
 ```
-**Rollback:** `sudo -u vybe git -C /opt/vybe checkout <previous-tag> && sudo /opt/vybe/deploy/deploy.sh`. Migrations are additive by policy (DATABASE.md), so the previous release runs on the newer schema. For a bad migration, restore the pre-deploy backup (BACKUP_RESTORE.md).
+**Rollback:** archive the previous commit (`git archive <tag>`) and run the same commands. Migrations are additive by policy (DATABASE.md), so the previous release runs on the newer schema. For a bad migration, restore the pre-deploy backup (BACKUP_RESTORE.md).
 
 ## 4. Verify (don't assume)
-From the VM:
+On the VM:
 ```bash
-sudo ss -tlnp | grep -E ':(3000|5432)'   # must show 127.0.0.1 only
-curl -fsS http://127.0.0.1:3000/ready
-sudo certbot renew --dry-run
-systemctl status vybe-api vybe-backup.timer certbot.timer
+cd ~/vybe/deploy && docker compose ps            # db healthy, migrate exited 0, vybe-api healthy
+docker compose logs --tail 50 vybe-api
+docker port vybe-vybe-api-1; docker port vybe-db-1   # both print nothing: no published ports
 ```
-From **outside** (your laptop):
+From **outside**:
 ```bash
 curl -fsS https://api.161-153-37-106.sslip.io/health
-nmap -Pn -p 22,80,443,3000,5432,6379 161.153.37.106   # expect 80/443 open, 22 open only from your IP, the rest filtered
+nmap -Pn -p 22,80,443,3000,5432 161.153.37.106    # expect 22/80/443 open, the rest filtered
 ```
 A WebSocket check needs a token: `npx wscat -c wss://api.161-153-37-106.sslip.io/ws -H "Authorization: Bearer <token>"` should print a `hello` event.
 
 ## 5. Build the Android app against production
+On any OS with Docker (this avoids the Windows path-length problem):
 ```bash
 cd apps/mobile
-APP_VARIANT=production EXPO_PUBLIC_API_URL=https://api.161-153-37-106.sslip.io npx expo prebuild -p android --clean
-cd android && ./gradlew assembleRelease     # sign with your upload keystore (never commit it)
+docker build -f Dockerfile.android --build-arg EXPO_PUBLIC_API_URL=https://api.161-153-37-106.sslip.io --output dist .
 ```
+`dist/vybe-release.apk` is arm64-only and signed with a throwaway debug key: fine for side-loading tests. Play Store releases need your own upload keystore (never commit it).
 
 ## Operations
-- **Logs:** `journalctl -u vybe-api -f` (structured JSON, secrets redacted). nginx: `/var/log/nginx/vybe.access.log` (no query strings), rotated by logrotate.
-- **Restart policy:** systemd `Restart=on-failure`; `MemoryMax=768M`.
+- **Logs:** `docker compose logs -f vybe-api` (structured JSON, secrets redacted).
+- **Restart policy:** `unless-stopped` on db and API; the API has a `/ready` health check.
 - **Health:** `/health` (liveness), `/ready` (DB). Point an uptime monitor at `https://…/health`.
-- **Disk:** `backup.sh` refuses to run above 90% usage. Add a monthly check of `df -h`.
+- **Disk:** `backup.sh` refuses to run above 90% usage. Check `df -h` and `docker system df` monthly.
 - **Dependency updates:** monthly `npm audit` + `npx expo install --check`; patch, run the full test suite, deploy.
-- **Scaling note:** rate limits and presence are in-process. Before running a 2nd API process, add Redis (see the `shortcut:` comments).
+- **Scaling note:** rate limits and presence are in-process. Before running a second API process, add Redis (see the `shortcut:` comments).
 
 ## Incident response (short)
-1. **Contain:** `sudo systemctl stop vybe-api` (or block at nginx) if data is leaking.
-2. **Revoke:** rotate `JWT_SECRET` in `/etc/vybe/vybe.env` and restart (invalidates every access token; refresh tokens still need valid sessions). To force everyone out: `UPDATE sessions SET "revokedAt" = now() WHERE "revokedAt" IS NULL;`.
-3. **Investigate:** `audit_events`, `journalctl -u vybe-api --since …`, nginx logs.
-4. **Recover:** restore from backup if needed; redeploy a known-good tag.
+1. **Contain:** `docker compose stop vybe-api` if data is leaking.
+2. **Revoke:** rotate `JWT_SECRET` in `deploy/.env` and run `docker compose up -d`. This invalidates every access token; refresh tokens still need valid sessions. To force everyone out: `docker compose exec db psql -U vybe -c 'UPDATE sessions SET "revokedAt" = now() WHERE "revokedAt" IS NULL;'`.
+3. **Investigate:** `audit_events`, `docker compose logs --since …`.
+4. **Recover:** restore from backup if needed; redeploy a known-good commit.
 5. **Notify** affected users and authorities as required by law; write a postmortem.

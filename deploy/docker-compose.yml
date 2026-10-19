@@ -1,0 +1,56 @@
+# Vybe on the Oracle VM, alongside Bunkr. Bunkr's Caddy (ports 80/443) terminates TLS and proxies
+# api.<ip>.sslip.io to `vybe-api` over Bunkr's `deploy_default` network. Nothing here publishes a port.
+# Run from this folder: docker compose up -d --build   (setup.sh writes .env first)
+name: vybe
+x-logging: &logging
+  driver: json-file
+  options: { max-size: 10m, max-file: '3' }
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: vybe
+      POSTGRES_DB: vybe
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run setup.sh first}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'vybe', '-d', 'vybe']
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    build: { context: .., dockerfile: apps/server/Dockerfile, target: build }
+    env_file: .env
+    working_dir: /app/apps/server
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    depends_on: { db: { condition: service_healthy } }
+    networks: [internal]
+    restart: 'no'
+
+  # Named vybe-api, not api: on the shared network a second "api" alias would make Caddy
+  # round-robin Bunkr's traffic into Vybe.
+  vybe-api:
+    build: { context: .., dockerfile: apps/server/Dockerfile }
+    env_file: .env
+    volumes:
+      - media:/data/media
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    networks: [internal, proxy]
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  db-data:
+  media:
+
+networks:
+  internal:
+    internal: true # no route out: the database never talks to the internet
+  proxy:
+    external: true
+    name: deploy_default

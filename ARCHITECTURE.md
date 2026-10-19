@@ -10,10 +10,10 @@ Android app (Expo dev build)
  └─ FCM token ──► PUT /v1/me/push-token
           │ HTTPS / WSS (443)
           ▼
-nginx (TLS, rate limit, no query-string logging)
+Caddy (TLS, shared with Bunkr on the VM, no access logs)
           │ 127.0.0.1:3000
           ▼
-Express 5 API + ws (single Node process, systemd)
+Express 5 API + ws (single Node process, Docker container)
  ├─ lib/auth.ts   argon2id, JWT(15 min, session-bound), rotating refresh tokens
  ├─ lib/authz.ts  the only place that decides friend/block/location/photo/media access
  ├─ modules/*     auth, users, friends, locations, media, photos, keys, messages, privacy, reports/admin
@@ -21,7 +21,7 @@ Express 5 API + ws (single Node process, systemd)
  └─ jobs.ts       retention: locations 24 h, undelivered ciphertext 30 d, orphan media, tokens, audit 90 d
           │
           ├─ PostgreSQL 17 (localhost only)
-          └─ /var/lib/vybe/media (private files, served only via GET /v1/media/:id after authz)
+          └─ volume vybe_media (private files, served only via GET /v1/media/:id after authz)
 ```
 
 ## Key decisions (ADR summary)

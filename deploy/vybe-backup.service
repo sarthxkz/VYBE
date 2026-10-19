@@ -1,6 +1,0 @@
-[Unit]
-Description=Vybe encrypted backup
-
-[Service]
-Type=oneshot
-ExecStart=/opt/vybe/deploy/backup.sh

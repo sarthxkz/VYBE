@@ -17,7 +17,7 @@
 | Sessions (device name, timestamps), push token | Login | Security, notifications | User | `sessions` | Expired/revoked sessions purged after 30 days | Deleted |
 | Audit events (type, time, IP) | Security events | Abuse and takeover detection | Operators | `audit_events` | **90 days** | User's events deleted; one anonymous "account.deleted" kept |
 | Reports | User reports | Moderation | Operators | `reports` | Until resolved + kept for records | Reports *about* the user deleted; reports *by* them anonymized |
-| Request logs (method, path, status; no query strings or bodies) | Every request | Operations | Operators | journald / nginx logs | Rotated (journald/logrotate defaults) | Not linked to user id |
+| Request logs (method, path, status; no query strings or bodies) | Every request | Operations | Operators | Docker container logs | Rotated: 3 × 10 MB per container | Not linked to user id |
 | Encrypted backups (DB + media) | Nightly | Disaster recovery | Holder of the offline age key | `/var/backups/vybe` | **14 days** | Deleted data disappears from backups as they roll off |
 
 **Third parties:** Oracle Cloud (hosting), the SMTP provider (email codes), Google (sign-in, if used), Firebase Cloud Messaging (generic push: category + ids, never content), OpenFreeMap tiles (map tile requests reveal the viewed area and IP to the tile server).

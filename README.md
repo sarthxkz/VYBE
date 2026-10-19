@@ -7,7 +7,7 @@ A private, Android-first social app: a live **friends map** with consent-based l
 | Android app | Expo SDK 58 (dev build), React Native 0.88, TypeScript, expo-router, TanStack Query, Zustand, MapLibre | `apps/mobile` |
 | E2EE native module | Kotlin + `org.signal:libsignal-android` 0.105.1 | `apps/mobile/modules/vybe-signal` |
 | API | Node 24, Express 5, Prisma 7, PostgreSQL 17, `ws` | `apps/server` |
-| Ops | nginx + Let's Encrypt, systemd, age-encrypted backups, Oracle Cloud VM | `deploy/` |
+| Ops | Docker Compose behind Caddy (auto TLS), age-encrypted backups, Oracle Cloud VM | `deploy/` |
 
 Status of every feature, including what is **not** verified yet, is in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 

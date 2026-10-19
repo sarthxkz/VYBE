@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.env
+.env*
+!.env.example
+apps/mobile
+apps/server/src/generated
+apps/server/.media
+**/*.log
+graphify-out
+.git

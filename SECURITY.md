@@ -16,13 +16,13 @@
 | **Token theft** | Access token 15 min, in memory only; refresh token in Keystore-backed SecureStore (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`); every request re-checks that the session is live, so logout/revoke is instant; WS closed on revoke/expiry. | Rooted device malware can read app memory. |
 | **IDOR / broken object authorization** | Every object lookup filters by ownership or audience; unauthorized → 404; tests swap photo/media IDs and try other users' queues and acks. | — |
 | **Private media URL leakage** | No public URLs; authz on every fetch; `Cache-Control: private`; chat media is ciphertext with the key only inside the Signal message. | Recipients can screenshot or save photos — stated in the UI and Terms. |
-| **Malicious uploads** | 12/16 MB limits (nginx + multer), image decode via sharp with pixel limit, re-encode to JPEG (drops EXIF/GPS and polyglots), server-generated file names, `nosniff`. | Image-decoder 0-days (keep sharp updated). |
+| **Malicious uploads** | 12/16 MB limits (Caddy + multer), image decode via sharp with pixel limit, re-encode to JPEG (drops EXIF/GPS and polyglots), server-generated file names, `nosniff`. | Image-decoder 0-days (keep sharp updated). |
 | **Spam / abuse** | Rate limits on search, requests, messages, uploads, reports; blocks sever everything; reports + admin suspend. | Single-process in-memory limiter (see Redis note). |
 | **Replay / duplicates** | `clientMsgId` idempotency; Signal's built-in duplicate detection; refresh tokens single-use; last-resort Kyber key base-key replay check on device. | — |
 | **WebSocket abuse** | JWT on upgrade, 4 KB max frame, typing throttled 1/s and friend-only, no client-chosen subscriptions, heartbeat drops dead sockets. | — |
 | **Device compromise** | Signal state encrypted under a non-exportable Android Keystore AES key in `noBackupFilesDir`; chat DB is SQLCipher with a Keystore-protected key; `allowBackup=false`. | An unlocked, rooted device exposes decrypted history. |
 | **Server compromise** | Attacker gets metadata (who, when, friend graph, latest locations of sharers, photos) but not chat content or private keys. Backups are encrypted to an offline age key. | Photos are not E2EE (server-side private storage) — documented. |
-| **Secrets in logs** | pino redaction of auth headers, passwords, tokens, ciphertext; URLs logged without query strings (app + nginx); test asserts redaction. | — |
+| **Secrets in logs** | pino redaction of auth headers, passwords, tokens, ciphertext; URLs logged without query strings (app; Caddy keeps no access log); test asserts redaction. | — |
 | **SQL injection** | Prisma parameterized queries; the two raw queries use tagged templates (parameterized). | — |
 | **Dependency vulnerabilities** | `npm audit` in CI checklist; lockfiles committed; versions pinned to SDK-compatible ranges. | Transitive advisories in Expo tooling (dev-only). |
 
@@ -31,7 +31,7 @@
 - `helmet` headers; no CORS (no browser clients); `x-powered-by` off; JSON body ≤1 MB.
 - Errors: generic messages, no stack traces (tested).
 - Audit events: register, login (ok/failed), refresh reuse, password reset/change, session revoke, block, keys registered/changed, ghost on/off, admin actions, account deleted. Retained 90 days.
-- Least privilege: `vybe` system user, systemd sandboxing (`ProtectSystem=strict`, no capabilities), DB role without superuser/createrole.
+- Least privilege: API runs as the unprivileged `node` user in its container; no published ports (only Caddy reaches it); Postgres on an internal-only network. shortcut: the DB role owns its database (Postgres image default) rather than a separate migration role; split roles if more services share the DB.
 
 ## Known gaps (tracked in PROJECT_STATUS.md)
 - No 2FA, and no email notice on new-device sign-in.
