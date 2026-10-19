@@ -1,7 +1,12 @@
 import '@/features/location/tracking'; // registers the background task at startup (required for headless runs)
 import '@/features/notifications';
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, usePathname, type ErrorBoundaryProps } from 'expo-router';
+import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
+import { View } from 'react-native';
+import { API_URL } from '@/api/client';
+import { Button, Text } from '@/ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -9,7 +14,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts, BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold } from '@expo-google-fonts/bricolage-grotesque';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { useSession } from '@/stores/session';
-import { useColors } from '@/theme';
+import { space, useColors } from '@/theme';
 import { queryClient } from '@/lib/query';
 import { RealtimeBridge } from '@/features/RealtimeBridge';
 import { OfflineBanner } from '@/features/OfflineBanner';
@@ -79,5 +84,40 @@ export default function RootLayout() {
         </Stack>
       </QueryClientProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * Any render crash lands here instead of a blank screen, and is reported (message + stack, no user data) so it
+ * shows up in the server logs. Plain fetch: the error may have come from the API client itself.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const path = usePathname();
+  useEffect(() => {
+    void fetch(`${API_URL}/v1/client-errors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: String(error?.message ?? error).slice(0, 500),
+        stack: error?.stack?.slice(0, 4000),
+        path: path?.slice(0, 200),
+        version: Constants.expoConfig?.version,
+        updateId: Updates.updateId ?? undefined,
+      }),
+    }).catch(() => {});
+  }, [error, path]);
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.md, backgroundColor: '#14121F' }}>
+      <Text variant="title" color="#fff" accessibilityRole="header">
+        Something went wrong
+      </Text>
+      <Text color="#C9C4DD" style={{ textAlign: 'center' }}>
+        We’ve sent the details to the Vybe team. Try again, or go back.
+      </Text>
+      <Text variant="caption" color="#8F89A8" style={{ textAlign: 'center' }} numberOfLines={3}>
+        {String(error?.message ?? error)}
+      </Text>
+      <Button title="Try again" onPress={retry} />
+    </View>
   );
 }

@@ -97,3 +97,11 @@ describe('mood', () => {
       .expect(400);
   });
 });
+
+describe('client error reports', () => {
+  it('accepts a capped report without auth and rejects oversized or unknown fields', async () => {
+    await api().post('/v1/client-errors').send({ message: 'boom', stack: 'at x', path: '/settings/about', version: '0.1.0' }).expect(204);
+    await api().post('/v1/client-errors').send({ message: 'x'.repeat(501) }).expect(400);
+    await api().post('/v1/client-errors').send({ message: 'x', token: 'secret' }).expect(400);
+  });
+});

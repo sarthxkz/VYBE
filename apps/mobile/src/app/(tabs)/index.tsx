@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Pressable, Text as RNText, View } from 'react-native';
+import { AppState, FlatList, Pressable, Text as RNText, useColorScheme, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Camera, Map, UserLocation, ViewAnnotation, type CameraRef } from '@maplibre/maplibre-react-native';
@@ -15,7 +16,8 @@ import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } fro
 import { palette, radius, shadow, space, useColors } from '@/theme';
 
 // Free, keyless vector tiles (OpenFreeMap / OpenStreetMap). Attribution stays visible as the license requires.
-const MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const MAP_STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
+const MAP_THEME_KEY = 'vybe.map.theme';
 
 export default function MapScreen() {
   const c = useColors();
@@ -27,6 +29,18 @@ export default function MapScreen() {
   const [, tick] = useState(0);
   const me = useSession((st) => st.me);
   const [myPos, setMyPos] = useState<[number, number] | null>(null);
+  // Map theme: follows the phone until you pick one with the moon/sun button.
+  const system = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const [mapTheme, setMapTheme] = useState<'light' | 'dark' | null>(null);
+  useEffect(() => {
+    void SecureStore.getItemAsync(MAP_THEME_KEY).then((v) => (v === 'light' || v === 'dark') && setMapTheme(v)).catch(() => {});
+  }, []);
+  const theme = mapTheme ?? system;
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setMapTheme(next);
+    void SecureStore.setItemAsync(MAP_THEME_KEY, next).catch(() => {});
+  };
 
   const friends = useQuery({ queryKey: ['locations', 'friends'], queryFn: () => api<{ friends: FriendLocation[] }>('/locations/friends'), refetchInterval: 60_000 });
   const settings = useQuery({ queryKey: ['locations', 'settings'], queryFn: () => api<LocationSettings>('/locations/settings') });
@@ -99,7 +113,7 @@ export default function MapScreen() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <Map
         style={{ flex: 1 }}
-        mapStyle={MAP_STYLE}
+        mapStyle={MAP_STYLE[theme]}
         logo={false}
         attribution
         compass={false}
@@ -190,6 +204,14 @@ export default function MapScreen() {
       </SafeAreaView>
 
       <View style={{ position: 'absolute', right: space.lg, bottom: 170, gap: space.sm }}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'}
+          onPress={toggleTheme}
+          style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
+        >
+          <Ionicons name={theme === 'dark' ? 'sunny' : 'moon'} size={22} color={c.link} />
+        </Pressable>
         {perm !== 'none' && (
           <Pressable
             accessibilityRole="button"

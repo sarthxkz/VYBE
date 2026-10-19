@@ -37,4 +37,5 @@ export const rl = {
   keyBundle: make(60 * 60_000, 200, 'user'),
   message: make(60_000, 120, 'user'),
   report: make(60 * 60_000, 20, 'user'),
+  clientError: make(60_000, 10, 'ip'),
 };
