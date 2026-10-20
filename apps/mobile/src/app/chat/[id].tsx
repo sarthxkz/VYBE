@@ -1,19 +1,39 @@
-import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, Pressable, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Pressable, Text as RNText, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Signal from '@modules/vybe-signal';
-import { api } from '@/api/client';
+import { api, gifSource } from '@/api/client';
 import type { PublicUser, Relationship } from '@/api/types';
 import { chatDb, deleteConversation, messagesWith, useChatVersion, type ChatMessage } from '@/features/chat/db';
-import { deleteForEveryone, openImage, retryUnsent, sendImage, sendReadReceipts, sendText } from '@/features/chat/service';
+import { deleteForEveryone, openImage, retryUnsent, sendGif, sendImage, sendReaction, sendReadReceipts, sendSticker, sendText } from '@/features/chat/service';
+import { ChatTray } from '@/features/chat/ChatTray';
+import { Sticker } from '@/features/chat/stickers';
 import { pickFromLibrary } from '@/lib/images';
 import { sendEvent, subscribe } from '@/lib/realtime';
 import { useSession } from '@/stores/session';
-import { Avatar, Row, Screen, Text } from '@/ui';
+import { Avatar, Row, Screen, Text, type AvatarLook } from '@/ui';
 import { font, radius, space, useColors } from '@/theme';
+
+const REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
+
+// "Only 1–3 emoji" messages are shown big. Built at runtime inside try: if the JS engine lacks Unicode property
+// escapes, we just skip big emoji instead of failing to load the screen.
+const onlyEmoji = (() => {
+  try {
+    const all = new RegExp('^(?:\\p{Extended_Pictographic}|\\p{Emoji_Component}|\\u200d|\\ufe0f|\\s)+$', 'u');
+    const one = new RegExp('\\p{Extended_Pictographic}', 'gu');
+    return (s: string) => all.test(s) && !/^[\d#*\s]+$/.test(s) && (s.match(one)?.length ?? 0) <= 3;
+  } catch {
+    return () => false;
+  }
+})();
+
+const preview = (m?: ChatMessage) =>
+  !m ? '' : m.deleted ? 'Deleted message' : m.kind === 'image' ? 'Photo' : m.kind === 'gif' ? 'GIF' : m.kind === 'sticker' ? 'Sticker' : (m.body ?? '');
 
 export default function ChatScreen() {
   const { id: peerId } = useLocalSearchParams<{ id: string }>();
@@ -24,8 +44,11 @@ export default function ChatScreen() {
   const [text, setText] = useState('');
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [typing, setTyping] = useState(false);
+  const [tray, setTray] = useState(false);
+  const [sheet, setSheet] = useState<ChatMessage | null>(null);
   const [identityChanged, setIdentityChanged] = useState(false);
   const lastTypingSent = useRef(0);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
   const peer = useQuery({ queryKey: ['user', peerId], queryFn: () => api<PublicUser & { relationship: Relationship }>(`/users/${peerId}`) });
   const name = peer.data?.displayName ?? peer.data?.username ?? '…';
   const canChat = peer.data?.relationship === 'friends';
@@ -57,13 +80,18 @@ export default function ChatScreen() {
     });
   }, [peerId]);
 
+  const afterSend = () => {
+    setReplyTo(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+  };
   const send = async () => {
     const body = text.trim();
     if (!body) return;
     setText('');
-    setReplyTo(null);
+    const reply = replyTo?.id;
+    afterSend();
     sendEvent({ type: 'typing', data: { to: peerId, on: false } });
-    await sendText(peerId, body, replyTo?.id);
+    await sendText(peerId, body, reply);
   };
 
   const onType = (t: string) => {
@@ -71,6 +99,16 @@ export default function ChatScreen() {
     if (Date.now() - lastTypingSent.current > 3000 && t) {
       lastTypingSent.current = Date.now();
       sendEvent({ type: 'typing', data: { to: peerId, on: true } });
+    }
+  };
+
+  const toggleTray = () => {
+    if (tray) {
+      setTray(false);
+      input.current?.focus();
+    } else {
+      Keyboard.dismiss();
+      setTray(true);
     }
   };
 
@@ -90,14 +128,19 @@ export default function ChatScreen() {
           }
         },
       },
-      { text: 'Mute for 8 hours', onPress: () => api(`/me/mutes/${peerId}`, { method: 'PUT', body: { until: new Date(Date.now() + 8 * 3600_000).toISOString() } }) },
-      { text: 'Unmute', onPress: () => api(`/me/mutes/${peerId}`, { method: 'DELETE' }) },
       {
-        text: 'Clear chat on this phone',
-        style: 'destructive',
-        onPress: () => Alert.alert('Clear this chat?', 'Messages are removed from this phone only.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: () => deleteConversation(peerId) }]),
+        text: 'More…',
+        onPress: () =>
+          Alert.alert(name, undefined, [
+            { text: 'Mute for 8 hours', onPress: () => api(`/me/mutes/${peerId}`, { method: 'PUT', body: { until: new Date(Date.now() + 8 * 3600_000).toISOString() } }) },
+            {
+              text: 'Clear chat on this phone',
+              style: 'destructive',
+              onPress: () => Alert.alert('Clear this chat?', 'Messages are removed from this phone only.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Clear', style: 'destructive', onPress: () => deleteConversation(peerId) }]),
+            },
+            { text: 'View profile', onPress: () => router.push(`/user/${peerId}`) },
+          ]),
       },
-      { text: 'View profile', onPress: () => router.push(`/user/${peerId}`) },
       { text: 'Close', style: 'cancel' },
     ]);
 
@@ -139,14 +182,25 @@ export default function ChatScreen() {
           data={[...messages].reverse()}
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ padding: space.md, gap: space.xs }}
-          renderItem={({ item }) => <Bubble m={item} quoted={item.replyTo ? byId.get(item.replyTo) : undefined} onLongPress={() => actions(item, peerId, setReplyTo)} />}
+          renderItem={({ item }) => (
+            <Bubble
+              m={item}
+              quoted={item.replyTo ? byId.get(item.replyTo) : undefined}
+              look={item.fromMe ? me?.avatarStyle : peer.data?.avatarStyle}
+              onLongPress={() => {
+                if (item.deleted || item.kind === 'system') return;
+                void Haptics.selectionAsync().catch(() => {});
+                setSheet(item);
+              }}
+            />
+          )}
         />
         {canChat ? (
           <View style={{ borderTopWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: space.sm }}>
             {replyTo && (
               <Row style={{ paddingHorizontal: space.sm, paddingBottom: space.xs }}>
                 <Text variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
-                  Replying to: {replyTo.body ?? 'Photo'}
+                  Replying to: {preview(replyTo)}
                 </Text>
                 <Pressable accessibilityLabel="Cancel reply" onPress={() => setReplyTo(null)}>
                   <Ionicons name="close" size={18} color={c.textMuted} />
@@ -164,9 +218,14 @@ export default function ChatScreen() {
               >
                 <Ionicons name="image" size={26} color={c.link} />
               </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={tray ? 'Show keyboard' : 'Emoji, stickers and GIFs'} onPress={toggleTray}>
+                <Ionicons name={tray ? 'keypad' : 'happy'} size={26} color={c.link} />
+              </Pressable>
               <TextInput
+                ref={input}
                 value={text}
                 onChangeText={onType}
+                onFocus={() => setTray(false)}
                 placeholder="Message"
                 placeholderTextColor={c.textMuted}
                 multiline
@@ -192,22 +251,75 @@ export default function ChatScreen() {
             </Text>
           </View>
         )}
+        {canChat && tray && (
+          <ChatTray
+            onEmoji={(e) => setText((t) => t + e)}
+            onSticker={(id) => {
+              const reply = replyTo?.id;
+              afterSend();
+              void sendSticker(peerId, id, reply);
+            }}
+            onGif={(g) => {
+              const reply = replyTo?.id;
+              afterSend();
+              void sendGif(peerId, g, reply);
+            }}
+          />
+        )}
       </KeyboardAvoidingView>
+      <MessageSheet m={sheet} peerId={peerId} onClose={() => setSheet(null)} onReply={setReplyTo} />
     </Screen>
   );
 }
 
-function actions(m: ChatMessage, peerId: string, setReplyTo: (m: ChatMessage) => void) {
-  if (m.deleted || m.kind === 'system') return;
-  Alert.alert('Message', undefined, [
-    { text: 'Reply', onPress: () => setReplyTo(m) },
-    ...(m.fromMe ? [{ text: 'Delete for everyone', style: 'destructive' as const, onPress: () => void deleteForEveryone(peerId, m.id) }] : []),
-    ...(m.status === 'failed' ? [{ text: 'Retry sending', onPress: () => void retryUnsent() }] : []),
-    { text: 'Cancel', style: 'cancel' as const },
-  ]);
+/** Long-press sheet: quick reactions plus actions (Android alerts only fit 3 buttons). */
+function MessageSheet({ m, peerId, onClose, onReply }: { m: ChatMessage | null; peerId: string; onClose: () => void; onReply: (m: ChatMessage) => void }) {
+  const c = useColors();
+  if (!m) return null;
+  const mine = (JSON.parse(m.reactions ?? '{}') as { mine?: string }).mine;
+  const act = (fn: () => void) => () => {
+    onClose();
+    fn();
+  };
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(20,18,31,0.45)', justifyContent: 'flex-end' }} onPress={onClose} accessibilityLabel="Close">
+        <Pressable style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: space.lg, paddingBottom: space.xxl, gap: space.md }}>
+          <Row style={{ justifyContent: 'space-around' }}>
+            {REACTIONS.map((e) => (
+              <Pressable
+                key={e}
+                accessibilityRole="button"
+                accessibilityLabel={mine === e ? `Remove reaction ${e}` : `React ${e}`}
+                onPress={act(() => void sendReaction(peerId, m.id, mine === e ? null : e))}
+                style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: mine === e ? c.brand : c.surfaceAlt }}
+              >
+                <RNText style={{ fontSize: 26 }}>{e}</RNText>
+              </Pressable>
+            ))}
+          </Row>
+          <SheetItem icon="arrow-undo" label="Reply" onPress={act(() => onReply(m))} />
+          {m.status === 'failed' && <SheetItem icon="refresh" label="Retry sending" onPress={act(() => void retryUnsent())} />}
+          {!!m.fromMe && <SheetItem icon="trash" label="Delete for everyone" danger onPress={act(() => void deleteForEveryone(peerId, m.id))} />}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 }
 
-function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessage; onLongPress: () => void }) {
+function SheetItem({ icon, label, onPress, danger }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; danger?: boolean }) {
+  const c = useColors();
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm }}>
+      <Ionicons name={icon} size={22} color={danger ? c.danger : c.link} />
+      <Text variant="bodyStrong" color={danger ? c.danger : undefined}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function Bubble({ m, quoted, look, onLongPress }: { m: ChatMessage; quoted?: ChatMessage; look?: AvatarLook | null; onLongPress: () => void }) {
   const c = useColors();
   const [img, setImg] = useState<string | null>(null);
   useEffect(() => {
@@ -225,28 +337,55 @@ function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessa
   const fg = mine ? c.brandText : c.text;
   const tick = { sending: '🕓', failed: '⚠️ Not sent · hold to retry', sent: '✓', delivered: '✓✓', read: 'Read', received: '' }[m.status];
   const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const reactions = Object.values(JSON.parse(m.reactions ?? '{}') as Record<string, string>);
+  const bigEmoji = m.kind === 'text' && !m.deleted && !quoted && !!m.body && onlyEmoji(m.body);
+  const bare = !m.deleted && (m.kind === 'sticker' || m.kind === 'gif' || bigEmoji); // no bubble behind it
+
+  let content;
+  if (m.deleted) {
+    content = (
+      <Text color={fg} style={{ fontStyle: 'italic', opacity: 0.8 }}>
+        Message deleted
+      </Text>
+    );
+  } else if (m.kind === 'image') {
+    content = img ? <Image source={{ uri: img }} style={{ width: 220, height: 260, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo" /> : <Text color={fg}>📷 Loading photo…</Text>;
+  } else if (m.kind === 'gif' && m.image) {
+    const g = JSON.parse(m.image) as { gifId: string; w: number; h: number };
+    content = <Image source={gifSource(g.gifId, 'full')} style={{ width: 220, aspectRatio: g.w / g.h || 1, borderRadius: radius.lg, backgroundColor: c.surfaceAlt }} contentFit="cover" accessibilityLabel="GIF" />;
+  } else if (m.kind === 'sticker') {
+    content = <Sticker id={m.body ?? ''} look={look} size={148} />;
+  } else if (bigEmoji) {
+    content = <RNText style={{ fontSize: 52, lineHeight: 64 }}>{m.body}</RNText>;
+  } else {
+    content = (
+      <Text color={fg} selectable>
+        {m.body}
+      </Text>
+    );
+  }
+
   return (
-    <Pressable onLongPress={onLongPress} accessibilityHint="Long press for options" style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-      <View style={{ backgroundColor: mine ? c.brand : c.surface, borderRadius: radius.lg, borderBottomRightRadius: mine ? 6 : radius.lg, borderBottomLeftRadius: mine ? radius.lg : 6, padding: space.md, gap: space.xs }}>
-        {quoted && (
-          <View style={{ borderLeftWidth: 3, borderColor: mine ? '#fff' : c.brand, paddingLeft: space.sm, opacity: 0.8 }}>
-            <Text variant="caption" color={fg} numberOfLines={2}>
-              {quoted.deleted ? 'Deleted message' : (quoted.body ?? 'Photo')}
-            </Text>
-          </View>
-        )}
-        {m.deleted ? (
-          <Text color={fg} style={{ fontStyle: 'italic', opacity: 0.8 }}>
-            Message deleted
-          </Text>
-        ) : m.kind === 'image' ? (
-          img ? <Image source={{ uri: img }} style={{ width: 220, height: 260, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo" /> : <Text color={fg}>📷 Loading photo…</Text>
-        ) : (
-          <Text color={fg} selectable>
-            {m.body}
-          </Text>
-        )}
-      </View>
+    <Pressable onLongPress={onLongPress} accessibilityHint="Long press to react or reply" style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+      {bare ? (
+        content
+      ) : (
+        <View style={{ backgroundColor: mine ? c.brand : c.surface, borderRadius: radius.lg, borderBottomRightRadius: mine ? 6 : radius.lg, borderBottomLeftRadius: mine ? radius.lg : 6, padding: space.md, gap: space.xs }}>
+          {quoted && (
+            <View style={{ borderLeftWidth: 3, borderColor: mine ? '#fff' : c.brand, paddingLeft: space.sm, opacity: 0.8 }}>
+              <Text variant="caption" color={fg} numberOfLines={2}>
+                {preview(quoted)}
+              </Text>
+            </View>
+          )}
+          {content}
+        </View>
+      )}
+      {reactions.length > 0 && (
+        <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: -8, marginHorizontal: space.sm, backgroundColor: c.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6, paddingVertical: 1 }}>
+          <RNText style={{ fontSize: 14 }}>{reactions.join(' ')}</RNText>
+        </View>
+      )}
       <Text variant="caption" muted style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: 2 }}>
         {time}
         {mine && tick ? ` · ${tick}` : ''}

@@ -17,6 +17,8 @@ const schema = z.object({
     .default('')
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
   FCM_SERVICE_ACCOUNT_PATH: z.string().optional(),
+  // Optional: enables GIF search in chat (proxied; see modules/gifs).
+  GIPHY_API_KEY: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

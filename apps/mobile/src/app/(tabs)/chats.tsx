@@ -19,7 +19,9 @@ export default function ChatsScreen() {
   }, [v]);
 
   const byId = new Map((friends.data?.friends ?? []).map((f) => [f.id, f]));
-  const preview = (m: ChatMessage) => (m.deleted ? 'Message deleted' : m.kind === 'image' ? '📷 Photo' : m.kind === 'system' ? m.body : `${m.fromMe ? 'You: ' : ''}${m.body ?? ''}`);
+  const you = (m: ChatMessage) => (m.fromMe ? 'You: ' : '');
+  const preview = (m: ChatMessage) =>
+    m.deleted ? 'Message deleted' : m.kind === 'image' ? `${you(m)}📷 Photo` : m.kind === 'gif' ? `${you(m)}GIF` : m.kind === 'sticker' ? `${you(m)}✨ Sticker` : m.kind === 'system' ? m.body : `${you(m)}${m.body ?? ''}`;
 
   return (
     <Screen edges={['top']}>

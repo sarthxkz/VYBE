@@ -112,6 +112,13 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
 }
 
 /** expo-image source for an authenticated media download. cacheKey keeps cache stable across token rotation. */
+/** A GIF through our GIPHY proxy (the phone never contacts GIPHY). */
+export const gifSource = (gifId: string, variant: 'small' | 'full' = 'small') => ({
+  uri: `${API_URL}/v1/gifs/${gifId}/${variant}`,
+  headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+  cacheKey: `gif-${gifId}-${variant}`,
+});
+
 export const mediaSource = (id: string) => ({
   uri: `${API_URL}/v1/media/${id}`,
   headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,

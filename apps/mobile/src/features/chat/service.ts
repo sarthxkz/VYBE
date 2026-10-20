@@ -5,7 +5,7 @@ import Signal, { type Bundle } from '@modules/vybe-signal';
 import { api, API_URL, ApiError, tokens } from '@/api/client';
 import { b64ToUtf8, utf8ToB64 } from '@/lib/bytes';
 import { subscribe } from '@/lib/realtime';
-import { insertMessage, kvGet, kvSet, markDeleted, setStatus, unsent, type ChatMessage } from './db';
+import { insertMessage, kvGet, kvSet, markDeleted, setReaction, setStatus, unsent, type ChatMessage } from './db';
 
 /**
  * Wire payload, encrypted end-to-end with the Signal protocol. The server sees only ciphertext.
@@ -15,7 +15,10 @@ export type Payload =
   | { v: 1; t: 'text'; id: string; ts: number; body: string; replyTo?: string }
   | { v: 1; t: 'image'; id: string; ts: number; image: { mediaId: string; key: string; w?: number; h?: number }; body?: string; replyTo?: string }
   | { v: 1; t: 'read'; id: string; ts: number; ids: string[] }
-  | { v: 1; t: 'delete'; id: string; ts: number; target: string };
+  | { v: 1; t: 'delete'; id: string; ts: number; target: string }
+  | { v: 1; t: 'gif'; id: string; ts: number; gif: { gifId: string; w: number; h: number }; replyTo?: string }
+  | { v: 1; t: 'sticker'; id: string; ts: number; sticker: string; replyTo?: string }
+  | { v: 1; t: 'react'; id: string; ts: number; target: string; emoji: string | null };
 
 const PREKEY_BATCH = 50;
 const PREKEY_LOW_WATER = 15;
@@ -76,6 +79,20 @@ async function deliver(peerId: string, payload: Payload) {
   }
 }
 
+async function sendKind(peerId: string, kind: 'gif' | 'sticker', fields: Pick<ChatMessage, 'body' | 'image'>, replyTo?: string) {
+  const msg: ChatMessage = { id: Crypto.randomUUID(), peerId, fromMe: 1, kind, ...fields, replyTo: replyTo ?? null, status: 'sending', createdAt: Date.now(), deleted: 0 };
+  await insertMessage(msg);
+  await trySend(msg);
+}
+export const sendGif = (peerId: string, gif: { gifId: string; w: number; h: number }, replyTo?: string) => sendKind(peerId, 'gif', { body: null, image: JSON.stringify(gif) }, replyTo);
+export const sendSticker = (peerId: string, sticker: string, replyTo?: string) => sendKind(peerId, 'sticker', { body: sticker, image: null }, replyTo);
+
+/** React to a message (or clear with null). Encrypted like everything else; the server can't see reactions. */
+export async function sendReaction(peerId: string, target: string, emoji: string | null) {
+  await setReaction(target, peerId, 'mine', emoji);
+  await deliver(peerId, { v: 1, t: 'react', id: Crypto.randomUUID(), ts: Date.now(), target, emoji }).catch((e) => reportError('chat-react', e));
+}
+
 export async function sendText(peerId: string, body: string, replyTo?: string) {
   const id = Crypto.randomUUID();
   const msg: ChatMessage = { id, peerId, fromMe: 1, kind: 'text', body, replyTo: replyTo ?? null, image: null, status: 'sending', createdAt: Date.now(), deleted: 0 };
@@ -103,10 +120,15 @@ export async function sendImage(peerId: string, uri: string, w?: number, h?: num
 }
 
 async function trySend(m: ChatMessage) {
+  const replyTo = m.replyTo ?? undefined;
   const payload: Payload =
     m.kind === 'image'
-      ? { v: 1, t: 'image', id: m.id, ts: m.createdAt, image: JSON.parse(m.image!), replyTo: m.replyTo ?? undefined }
-      : { v: 1, t: 'text', id: m.id, ts: m.createdAt, body: m.body ?? '', replyTo: m.replyTo ?? undefined };
+      ? { v: 1, t: 'image', id: m.id, ts: m.createdAt, image: JSON.parse(m.image!), replyTo }
+      : m.kind === 'gif'
+        ? { v: 1, t: 'gif', id: m.id, ts: m.createdAt, gif: JSON.parse(m.image!), replyTo }
+        : m.kind === 'sticker'
+          ? { v: 1, t: 'sticker', id: m.id, ts: m.createdAt, sticker: m.body ?? '', replyTo }
+          : { v: 1, t: 'text', id: m.id, ts: m.createdAt, body: m.body ?? '', replyTo };
   try {
     await deliver(m.peerId, payload);
     await setStatus(m.id, 'sent');
@@ -172,6 +194,16 @@ async function handleIncoming(m: Wire) {
       break;
     case 'delete':
       await markDeleted(payload.target, m.senderId, 0);
+      break;
+    case 'gif':
+      if (/^[A-Za-z0-9]{4,40}$/.test(payload.gif?.gifId ?? ''))
+        await insertMessage({ ...base, id: payload.id, kind: 'gif', body: null, image: JSON.stringify({ gifId: payload.gif.gifId, w: Number(payload.gif.w) || 200, h: Number(payload.gif.h) || 200 }), replyTo: payload.replyTo ?? null });
+      break;
+    case 'sticker':
+      await insertMessage({ ...base, id: payload.id, kind: 'sticker', body: String(payload.sticker).slice(0, 40), replyTo: payload.replyTo ?? null });
+      break;
+    case 'react':
+      await setReaction(payload.target, m.senderId, 'theirs', payload.emoji ? String(payload.emoji).slice(0, 16) : null);
       break;
   }
 }

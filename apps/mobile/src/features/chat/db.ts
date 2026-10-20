@@ -11,13 +11,14 @@ export type ChatMessage = {
   id: string; // client message id (same on both devices)
   peerId: string;
   fromMe: number;
-  kind: 'text' | 'image' | 'system';
+  kind: 'text' | 'image' | 'gif' | 'sticker' | 'system';
   body: string | null;
   replyTo: string | null;
-  image: string | null; // JSON: { mediaId, key, w, h }
+  image: string | null; // JSON: image { mediaId, key, w, h } or gif { gifId, w, h }; sticker id is in body
   status: MessageStatus;
   createdAt: number;
   deleted: number;
+  reactions?: string | null; // JSON { mine?: emoji, theirs?: emoji }
 };
 
 /** Bumped on every write so screens re-query. */
@@ -56,6 +57,8 @@ export function chatDb() {
       CREATE INDEX IF NOT EXISTS messages_peer ON messages(peerId, createdAt);
       CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY NOT NULL, v TEXT);
     `);
+    // Added after release: reactions. ALTER fails harmlessly once the column exists.
+    await db.execAsync('ALTER TABLE messages ADD COLUMN reactions TEXT').catch(() => {});
     return db;
   })();
   return dbPromise;
@@ -116,6 +119,18 @@ export async function unsent() {
 export async function deleteConversation(peerId: string) {
   const db = await chatDb();
   await db.runAsync('DELETE FROM messages WHERE peerId = ?', peerId);
+  useChatVersion.getState().bump();
+}
+
+/** Set my or their reaction on a message (null clears it). */
+export async function setReaction(id: string, peerId: string, side: 'mine' | 'theirs', emoji: string | null) {
+  const db = await chatDb();
+  const row = await db.getFirstAsync<{ reactions: string | null }>('SELECT reactions FROM messages WHERE id = ? AND peerId = ?', id, peerId);
+  if (!row) return;
+  const r = { ...(JSON.parse(row.reactions ?? '{}') as Record<string, string>) };
+  if (emoji) r[side] = emoji;
+  else delete r[side];
+  await db.runAsync('UPDATE messages SET reactions = ? WHERE id = ? AND peerId = ?', JSON.stringify(r), id, peerId);
   useChatVersion.getState().bump();
 }
 
