@@ -11,7 +11,7 @@ export const api = () => request(app);
 
 export async function resetDb() {
   // users cascades to nearly everything; audit_events has no FK.
-  await db.$executeRawUnsafe('TRUNCATE users, audit_events CASCADE');
+  await db.$executeRawUnsafe('TRUNCATE users, audit_events, gif_media CASCADE');
 }
 
 export type TestUser = { id: string; username: string; token: string; refreshToken: string; auth: { Authorization: string } };

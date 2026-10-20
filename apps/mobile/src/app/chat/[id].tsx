@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Pressable, Text as RNText, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
+import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -11,12 +13,13 @@ import type { PublicUser, Relationship } from '@/api/types';
 import { chatDb, deleteConversation, messagesWith, useChatVersion, type ChatMessage } from '@/features/chat/db';
 import { deleteForEveryone, openImage, retryUnsent, sendGif, sendImage, sendReaction, sendReadReceipts, sendSticker, sendText } from '@/features/chat/service';
 import { ChatTray } from '@/features/chat/ChatTray';
+import { setActiveChat } from '@/features/alerts';
 import { Sticker } from '@/features/chat/stickers';
 import { pickFromLibrary } from '@/lib/images';
 import { sendEvent, subscribe } from '@/lib/realtime';
 import { useSession } from '@/stores/session';
 import { Avatar, Row, Screen, Text, type AvatarLook } from '@/ui';
-import { font, radius, space, useColors } from '@/theme';
+import { font, palette, radius, space, useColors } from '@/theme';
 
 const REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
 
@@ -67,6 +70,11 @@ export default function ChatScreen() {
       useChatVersion.getState().bump();
     })();
   }, [history.data, peerId]);
+
+  useEffect(() => {
+    setActiveChat(peerId);
+    return () => setActiveChat(null);
+  }, [peerId]);
 
   useEffect(() => {
     void Signal.identityChanged(peerId).then(setIdentityChanged).catch(() => {});
@@ -145,6 +153,8 @@ export default function ChatScreen() {
     ]);
 
   const byId = new Map(messages.map((m) => [m.id, m]));
+  const rows = buildRows(messages);
+  const lastMineId = [...messages].reverse().find((m) => m.fromMe && m.kind !== 'system')?.id;
 
   return (
     <Screen padded={false} edges={['bottom']}>
@@ -167,7 +177,8 @@ export default function ChatScreen() {
               <Ionicons name="ellipsis-vertical" size={22} color={c.text} />
             </Pressable>
           ),
-          headerStyle: { backgroundColor: c.surface },
+          headerStyle: { backgroundColor: c.bg },
+          headerShadowVisible: false,
           headerTintColor: c.text,
         }}
       />
@@ -179,18 +190,25 @@ export default function ChatScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={90}>
         <FlatList
           inverted
-          data={[...messages].reverse()}
-          keyExtractor={(m) => m.id}
-          contentContainerStyle={{ padding: space.md, gap: space.xs }}
+          data={[...rows].reverse()}
+          keyExtractor={(r) => r.m.id}
+          contentContainerStyle={{ paddingHorizontal: space.md, paddingVertical: space.sm }}
           renderItem={({ item }) => (
             <Bubble
-              m={item}
-              quoted={item.replyTo ? byId.get(item.replyTo) : undefined}
-              look={item.fromMe ? me?.avatarStyle : peer.data?.avatarStyle}
+              row={item}
+              quoted={item.m.replyTo ? byId.get(item.m.replyTo) : undefined}
+              look={item.m.fromMe ? me?.avatarStyle : peer.data?.avatarStyle}
+              peer={peer.data}
+              isLastMine={item.m.id === lastMineId}
+              onDoubleTap={() => {
+                if (item.m.deleted || item.m.kind === 'system') return;
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                void sendReaction(peerId, item.m.id, '❤️');
+              }}
               onLongPress={() => {
-                if (item.deleted || item.kind === 'system') return;
+                if (item.m.deleted || item.m.kind === 'system') return;
                 void Haptics.selectionAsync().catch(() => {});
-                setSheet(item);
+                setSheet(item.m);
               }}
             />
           )}
@@ -207,7 +225,7 @@ export default function ChatScreen() {
                 </Pressable>
               </Row>
             )}
-            <Row gap={space.sm}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, backgroundColor: c.bg, borderRadius: 26, padding: 4 }}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Send a photo"
@@ -215,11 +233,10 @@ export default function ChatScreen() {
                   const img = await pickFromLibrary();
                   if (img) await sendImage(peerId, img.uri, img.width, img.height).catch(() => Alert.alert('Photo not sent', 'Check your connection and try again.'));
                 }}
+                style={{ width: 40, height: 40, borderRadius: 20, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
               >
-                <Ionicons name="image" size={26} color={c.link} />
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={tray ? 'Show keyboard' : 'Emoji, stickers and GIFs'} onPress={toggleTray}>
-                <Ionicons name={tray ? 'keypad' : 'happy'} size={26} color={c.link} />
+                <GradientFill />
+                <Ionicons name="camera" size={20} color="#fff" />
               </Pressable>
               <TextInput
                 ref={input}
@@ -231,18 +248,20 @@ export default function ChatScreen() {
                 multiline
                 maxLength={4000}
                 accessibilityLabel="Message"
-                style={{ flex: 1, maxHeight: 120, minHeight: 44, backgroundColor: c.bg, color: c.text, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.sm, fontFamily: font.body, fontSize: 16 }}
+                style={{ flex: 1, maxHeight: 120, minHeight: 40, color: c.text, paddingHorizontal: space.sm, paddingVertical: 9, fontFamily: font.body, fontSize: 16 }}
               />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-                disabled={!text.trim()}
-                onPress={send}
-                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: text.trim() ? c.brand : c.border, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="arrow-up" size={22} color="#fff" />
-              </Pressable>
-            </Row>
+              {text.trim() ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Send" onPress={send} hitSlop={8} style={{ height: 40, justifyContent: 'center', paddingHorizontal: space.md }}>
+                  <Text variant="bodyStrong" color={c.link}>
+                    Send
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable accessibilityRole="button" accessibilityLabel={tray ? 'Show keyboard' : 'Emoji, stickers and GIFs'} onPress={toggleTray} hitSlop={8} style={{ height: 40, justifyContent: 'center', paddingHorizontal: space.sm }}>
+                  <Ionicons name={tray ? 'keypad-outline' : 'happy-outline'} size={26} color={c.text} />
+                </Pressable>
+              )}
+            </View>
           </View>
         ) : (
           <View style={{ padding: space.lg, alignItems: 'center' }}>
@@ -319,27 +338,98 @@ function SheetItem({ icon, label, onPress, danger }: { icon: keyof typeof Ionico
   );
 }
 
-function Bubble({ m, quoted, look, onLongPress }: { m: ChatMessage; quoted?: ChatMessage; look?: AvatarLook | null; onLongPress: () => void }) {
+type ChatRow = { m: ChatMessage; first: boolean; last: boolean; day: string | null };
+const GROUP_MS = 5 * 60_000;
+const dayKey = (t: number) => new Date(t).toDateString();
+function dayLabel(t: number) {
+  const d = new Date(t);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (d.toDateString() === new Date().toDateString()) return `Today ${time}`;
+  if (d.toDateString() === new Date(Date.now() - 86_400_000).toDateString()) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })} ${time}`;
+}
+
+/** Instagram-style grouping: consecutive messages from the same person within 5 minutes share a block. */
+function buildRows(list: ChatMessage[]): ChatRow[] {
+  const together = (a?: ChatMessage, b?: ChatMessage) =>
+    !!a && !!b && a.fromMe === b.fromMe && a.kind !== 'system' && b.kind !== 'system' && Math.abs(b.createdAt - a.createdAt) < GROUP_MS && dayKey(a.createdAt) === dayKey(b.createdAt);
+  return list.map((m, i) => {
+    const prev = list[i - 1];
+    const next = list[i + 1];
+    const newDay = !prev || dayKey(prev.createdAt) !== dayKey(m.createdAt) || m.createdAt - prev.createdAt > 60 * 60_000;
+    return { m, first: !together(prev, m), last: !together(m, next), day: newDay ? dayLabel(m.createdAt) : null };
+  });
+}
+
+/** Brand gradient (grape → magenta) behind your own bubbles; white text keeps AA contrast on both ends. */
+function GradientFill() {
+  return (
+    <Svg style={StyleSheet.absoluteFill} preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id="mine" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={palette.grape600} />
+          <Stop offset="1" stopColor="#C42F7F" />
+        </LinearGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill="url(#mine)" />
+    </Svg>
+  );
+}
+
+function Bubble({
+  row,
+  quoted,
+  look,
+  peer,
+  isLastMine,
+  onLongPress,
+  onDoubleTap,
+}: {
+  row: ChatRow;
+  quoted?: ChatMessage;
+  look?: AvatarLook | null;
+  peer?: PublicUser;
+  isLastMine: boolean;
+  onLongPress: () => void;
+  onDoubleTap: () => void;
+}) {
+  const { m, first, last, day } = row;
   const c = useColors();
   const [img, setImg] = useState<string | null>(null);
+  const [heart, setHeart] = useState(false);
+  const lastTap = useRef(0);
   useEffect(() => {
     if (m.kind === 'image' && m.image && !m.deleted) void openImage(JSON.parse(m.image)).then(setImg).catch(() => setImg(null));
   }, [m.kind, m.image, m.deleted]);
 
+  const separator = day ? (
+    <Text variant="caption" muted style={{ textAlign: 'center', marginTop: space.lg, marginBottom: space.sm }}>
+      {day}
+    </Text>
+  ) : null;
+
   if (m.kind === 'system') {
     return (
-      <Text variant="caption" muted style={{ textAlign: 'center', marginVertical: space.sm }}>
-        {m.body}
-      </Text>
+      <View>
+        {separator}
+        <Text variant="caption" muted style={{ textAlign: 'center', marginVertical: space.sm }}>
+          {m.body}
+        </Text>
+      </View>
     );
   }
   const mine = !!m.fromMe;
-  const fg = mine ? c.brandText : c.text;
-  const tick = { sending: '🕓', failed: '⚠️ Not sent · hold to retry', sent: '✓', delivered: '✓✓', read: 'Read', received: '' }[m.status];
-  const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const reactions = Object.values(JSON.parse(m.reactions ?? '{}') as Record<string, string>);
   const bigEmoji = m.kind === 'text' && !m.deleted && !quoted && !!m.body && onlyEmoji(m.body);
-  const bare = !m.deleted && (m.kind === 'sticker' || m.kind === 'gif' || bigEmoji); // no bubble behind it
+  const bare = !m.deleted && (m.kind === 'sticker' || m.kind === 'gif' || m.kind === 'image' || bigEmoji);
+  const R = 20;
+  const S = 6;
+  const corners = mine
+    ? { borderTopLeftRadius: R, borderBottomLeftRadius: R, borderTopRightRadius: first ? R : S, borderBottomRightRadius: last ? R : S }
+    : { borderTopRightRadius: R, borderBottomRightRadius: R, borderTopLeftRadius: first ? R : S, borderBottomLeftRadius: last ? R : S };
+  const fg = mine ? '#FFFFFF' : c.text;
+  const statusText = { sending: 'Sending…', failed: 'Not sent · hold to retry', sent: 'Sent', delivered: 'Delivered', read: 'Seen', received: '' }[m.status];
+  const status = mine && (isLastMine || m.status === 'failed') ? statusText : '';
 
   let content;
   if (m.deleted) {
@@ -349,10 +439,16 @@ function Bubble({ m, quoted, look, onLongPress }: { m: ChatMessage; quoted?: Cha
       </Text>
     );
   } else if (m.kind === 'image') {
-    content = img ? <Image source={{ uri: img }} style={{ width: 220, height: 260, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo" /> : <Text color={fg}>📷 Loading photo…</Text>;
+    content = img ? (
+      <Image source={{ uri: img }} style={{ width: 220, height: 280, borderRadius: R }} contentFit="cover" accessibilityLabel="Photo" />
+    ) : (
+      <View style={{ width: 220, height: 280, borderRadius: R, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+        <Text muted>📷</Text>
+      </View>
+    );
   } else if (m.kind === 'gif' && m.image) {
     const g = JSON.parse(m.image) as { gifId: string; w: number; h: number };
-    content = <Image source={gifSource(g.gifId, 'full')} style={{ width: 220, aspectRatio: g.w / g.h || 1, borderRadius: radius.lg, backgroundColor: c.surfaceAlt }} contentFit="cover" accessibilityLabel="GIF" />;
+    content = <Image source={gifSource(g.gifId, 'full')} style={{ width: 220, aspectRatio: g.w / g.h || 1, borderRadius: R, backgroundColor: c.surfaceAlt }} contentFit="cover" accessibilityLabel="GIF" />;
   } else if (m.kind === 'sticker') {
     content = <Sticker id={m.body ?? ''} look={look} size={148} />;
   } else if (bigEmoji) {
@@ -365,31 +461,54 @@ function Bubble({ m, quoted, look, onLongPress }: { m: ChatMessage; quoted?: Cha
     );
   }
 
+  const tap = () => {
+    const now = Date.now();
+    if (now - lastTap.current < 300) {
+      lastTap.current = 0;
+      setHeart(true);
+      setTimeout(() => setHeart(false), 700);
+      onDoubleTap();
+    } else lastTap.current = now;
+  };
+
   return (
-    <Pressable onLongPress={onLongPress} accessibilityHint="Long press to react or reply" style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-      {bare ? (
-        content
-      ) : (
-        <View style={{ backgroundColor: mine ? c.brand : c.surface, borderRadius: radius.lg, borderBottomRightRadius: mine ? 6 : radius.lg, borderBottomLeftRadius: mine ? radius.lg : 6, padding: space.md, gap: space.xs }}>
-          {quoted && (
-            <View style={{ borderLeftWidth: 3, borderColor: mine ? '#fff' : c.brand, paddingLeft: space.sm, opacity: 0.8 }}>
-              <Text variant="caption" color={fg} numberOfLines={2}>
-                {preview(quoted)}
-              </Text>
+    <View style={{ marginTop: first ? space.sm : 2 }}>
+      {separator}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: mine ? 'flex-end' : 'flex-start', gap: space.xs }}>
+        {!mine && <View style={{ width: 28 }}>{last && <Avatar mediaId={peer?.avatarMediaId} look={peer?.avatarStyle} name={peer?.displayName ?? peer?.username} size={28} />}</View>}
+        <Pressable onPress={tap} onLongPress={onLongPress} delayLongPress={300} accessibilityHint="Double tap to like, hold for more" style={{ maxWidth: '76%' }}>
+          {bare ? (
+            content
+          ) : (
+            <View style={[{ backgroundColor: mine ? palette.grape600 : c.surfaceAlt, paddingHorizontal: 14, paddingVertical: 9, overflow: 'hidden', gap: space.xs }, corners]}>
+              {mine && <GradientFill />}
+              {quoted && (
+                <View style={{ borderLeftWidth: 3, borderColor: mine ? 'rgba(255,255,255,0.8)' : c.brand, paddingLeft: space.sm, opacity: 0.85 }}>
+                  <Text variant="caption" color={fg} numberOfLines={2}>
+                    {preview(quoted)}
+                  </Text>
+                </View>
+              )}
+              {content}
             </View>
           )}
-          {content}
-        </View>
+          {heart && (
+            <Animated.Text entering={ZoomIn.springify()} exiting={FadeOut} style={{ position: 'absolute', alignSelf: 'center', top: '20%', fontSize: 44 }}>
+              ❤️
+            </Animated.Text>
+          )}
+          {reactions.length > 0 && (
+            <View style={[{ position: 'absolute', bottom: -10, backgroundColor: c.surface, borderRadius: radius.pill, borderWidth: 2, borderColor: c.bg, paddingHorizontal: 5, paddingVertical: 1 }, mine ? { left: -4 } : { right: -4 }]}>
+              <RNText style={{ fontSize: 13 }}>{reactions.join('')}</RNText>
+            </View>
+          )}
+        </Pressable>
+      </View>
+      {(status !== '' || reactions.length > 0) && (
+        <Text variant="caption" color={m.status === 'failed' ? c.danger : c.textMuted} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: reactions.length ? 12 : 2, marginLeft: mine ? 0 : 34 }}>
+          {status}
+        </Text>
       )}
-      {reactions.length > 0 && (
-        <View style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: -8, marginHorizontal: space.sm, backgroundColor: c.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6, paddingVertical: 1 }}>
-          <RNText style={{ fontSize: 14 }}>{reactions.join(' ')}</RNText>
-        </View>
-      )}
-      <Text variant="caption" muted style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: 2 }}>
-        {time}
-        {mine && tick ? ` · ${tick}` : ''}
-      </Text>
-    </Pressable>
+    </View>
   );
 }

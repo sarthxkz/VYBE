@@ -32,6 +32,9 @@ private fun String.unb64() = Base64.decode(this, Base64.NO_WRAP)
 
 class SignalError(code: String, message: String, cause: Throwable? = null) : CodedException(code, message, cause)
 
+/** Exception class + message (never key material) so failures reported from phones say what actually broke. */
+private fun Throwable.describe() = "${javaClass.simpleName}: ${message ?: ""}".take(300)
+
 /**
  * JS bridge for the Signal protocol. Private keys, sessions and ratchet state never leave this module:
  * JS only receives public keys, ciphertext, and decrypted plaintext for display.
@@ -144,7 +147,7 @@ class VybeSignalModule : Module() {
       } catch (e: CodedException) {
         throw e
       } catch (e: Exception) {
-        throw SignalError("INVALID_BUNDLE", "Could not start an encrypted session", e)
+        throw SignalError("INVALID_BUNDLE", "Could not start an encrypted session (${e.describe()})", e)
       }
     }
 
@@ -175,7 +178,7 @@ class VybeSignalModule : Module() {
       } catch (e: org.signal.libsignal.protocol.DuplicateMessageException) {
         throw SignalError("DUPLICATE", "Already decrypted", e)
       } catch (e: Exception) {
-        throw SignalError("DECRYPT_FAILED", "Could not decrypt message", e)
+        throw SignalError("DECRYPT_FAILED", "Could not decrypt message (${e.describe()})", e)
       }
     }
 

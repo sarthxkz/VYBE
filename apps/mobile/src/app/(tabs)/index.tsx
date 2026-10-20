@@ -12,7 +12,9 @@ import { hotspots } from '@/features/map/hotspots';
 import { Hotspot } from '@/features/map/Hotspot';
 import type { EventPin, FriendLocation, LocationSettings, Mood, PublicUser } from '@/api/types';
 import { useSession } from '@/stores/session';
-import { ago, freshness, permissionLevel, startTracking, type PermissionLevel } from '@/features/location/tracking';
+import { ago, freshness, permissionLevel, startTracking, stopTracking, type PermissionLevel } from '@/features/location/tracking';
+import * as Haptics from 'expo-haptics';
+import { queryClient } from '@/lib/query';
 import { cluster } from '@/features/location/cluster';
 import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } from '@/ui';
 import { palette, radius, shadow, space, useColors } from '@/theme';
@@ -116,6 +118,20 @@ export default function MapScreen() {
   const s = settings.data;
   const status = !s ? '…' : s.ghost ? 'Ghost Mode is on' : !s.active ? 'You’re not sharing' : s.mode === 'ALL' ? 'Sharing with all friends' : `Sharing with ${s.grants.length} friend${s.grants.length === 1 ? '' : 's'}`;
   const statusColor = !s || !s.active ? c.textMuted : c.liveText;
+  // One-tap Ghost Mode from the map: hides you right away (the server deletes your stored spot).
+  const toggleGhost = async () => {
+    if (!s) return;
+    const ghost = !s.ghost;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    try {
+      await api('/locations/settings', { method: 'PUT', body: { ghost } });
+      if (ghost) await stopTracking();
+      else await startTracking();
+      void queryClient.invalidateQueries({ queryKey: ['locations'] });
+    } catch {
+      Alert.alert('Couldn’t change Ghost Mode', 'Check your connection and try again.');
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -186,37 +202,46 @@ export default function MapScreen() {
       </Map>
 
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space.lg }}>
-        <Row style={{ marginTop: space.sm }}>
+        <View style={[{ marginTop: space.sm, backgroundColor: c.surface, borderRadius: 28, padding: 6, flexDirection: 'row', alignItems: 'center', gap: space.sm }, shadow.float]}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={me?.mood ? `Your mood: ${me.mood.emoji} ${me.mood.text ?? ''}. Change it` : 'Set your mood'}
+            accessibilityLabel={me?.mood ? `Your vibe: ${me.mood.emoji} ${me.mood.text ?? ''}. Change it` : 'Set your vibe'}
             onPress={() => router.push('/mood')}
-            style={[{ height: 44, borderRadius: radius.pill, backgroundColor: c.surface, flexDirection: 'row', alignItems: 'center', paddingLeft: 3, paddingRight: space.md, gap: space.xs }, shadow.card]}
           >
-            <Avatar look={me?.avatarStyle} mediaId={me?.avatarMediaId} name={me?.displayName ?? me?.username} size={38} />
-            <RNText style={{ fontSize: 20 }}>{me?.mood?.emoji ?? '＋'}</RNText>
+            <Avatar look={me?.avatarStyle} mediaId={me?.avatarMediaId} name={me?.displayName ?? me?.username} size={44} ring={s?.active ? palette.lime400 : undefined} />
+            <View style={{ position: 'absolute', right: -6, bottom: -4, backgroundColor: c.surface, borderRadius: 12, paddingHorizontal: 3 }}>
+              <RNText style={{ fontSize: 15 }}>{me?.mood?.emoji ?? '＋'}</RNText>
+            </View>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${status}. Change who can see you`}
-            onPress={() => router.push('/settings/location')}
-            style={[{ flex: 1, backgroundColor: c.surface, borderRadius: radius.pill, paddingVertical: space.sm, paddingHorizontal: space.lg, flexDirection: 'row', alignItems: 'center', gap: space.sm }, shadow.card]}
-          >
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s?.active ? palette.lime400 : c.border }} />
-            <Text variant="label" color={statusColor} style={{ flex: 1 }} numberOfLines={1}>
-              {status}
+          <Pressable accessibilityRole="button" accessibilityLabel={`${status}. Change who can see you`} onPress={() => router.push('/settings/location')} style={{ flex: 1 }}>
+            <Row gap={6}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s?.ghost ? c.textMuted : s?.active ? palette.lime400 : c.border }} />
+              <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                {!s ? '…' : s.ghost ? 'Ghost Mode' : s.active ? 'You’re visible' : 'Not sharing'}
+              </Text>
+            </Row>
+            <Text variant="caption" color={statusColor} numberOfLines={1}>
+              {!s ? ' ' : s.ghost ? 'Nobody sees your spot' : !s.active ? 'Tap to share with friends' : s.mode === 'ALL' ? 'to all friends' : `to ${s.grants.length} friend${s.grants.length === 1 ? '' : 's'}`}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Friends"
-            onPress={() => router.push('/friends')}
-            style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-          >
-            <Ionicons name="people" size={22} color={c.link} />
+          {s && (s.active || s.ghost) && (
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: s.ghost }}
+              accessibilityLabel="Ghost Mode"
+              onPress={toggleGhost}
+              style={{ height: 40, borderRadius: 20, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: s.ghost ? palette.ink : c.surfaceAlt }}
+            >
+              <RNText style={{ fontSize: 16 }}>👻</RNText>
+              <Text variant="label" color={s.ghost ? '#fff' : c.text}>
+                {s.ghost ? 'On' : 'Ghost'}
+              </Text>
+            </Pressable>
+          )}
+          <Pressable accessibilityRole="button" accessibilityLabel="Friends" onPress={() => router.push('/friends')} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="people" size={20} color={c.link} />
           </Pressable>
-        </Row>
+        </View>
         {s?.active && perm === 'none' && (
           <Card style={{ marginTop: space.sm }} onPress={() => router.push('/settings/location')}>
             <Text variant="bodyStrong">Location is off for Vybe</Text>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { reportError } from '@/lib/report';
+import { alertPhoto, askForAlerts } from '@/features/alerts';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Signal from '@modules/vybe-signal';
@@ -38,7 +39,8 @@ export function RealtimeBridge() {
     // Tapping a "friend nearby" alert opens their profile. Only our own in-app paths are followed.
     const tap = Notifications.addNotificationResponseReceivedListener((r) => {
       const url = r.notification.request.content.data?.url;
-      if (typeof url === 'string' && /^\/user\/[0-9a-f-]{36}$/.test(url)) router.push(url as `/user/${string}`);
+      // Only our own in-app paths: a profile, a chat, or the Blink tab.
+      if (typeof url === 'string' && /^\/(user|chat)\/[0-9a-f-]{36}$|^\/photos$/.test(url)) router.push(url as `/user/${string}`);
     });
     const offEvents = subscribe((ev) => {
       const inv = (key: string) => void queryClient.invalidateQueries({ queryKey: [key] });
@@ -47,7 +49,10 @@ export function RealtimeBridge() {
         inv('requests');
         inv('locations');
       }
-      if (ev.type === 'photo:new') inv('photos');
+      if (ev.type === 'photo:new') {
+        inv('photos');
+        void alertPhoto(String(ev.data.senderId), !!ev.data.instant);
+      }
       if (ev.type === 'event:changed') inv('events');
       if (ev.type === 'presence') inv('friends');
       if (ev.type === 'location:update' || ev.type === 'location:removed') inv('locations');
@@ -59,6 +64,7 @@ export function RealtimeBridge() {
       await retryUnsent().catch(() => {});
       if (await shouldOfferRestore((await conversations().catch(() => [])).length)) router.push('/restore-chats');
       await registerPush(false);
+      await askForAlerts();
       // Recover location sharing after an app restart: follow the server's state, not stale local state.
       const s = await api<LocationSettings>('/locations/settings').catch(() => null);
       if (s?.active) await startTracking();

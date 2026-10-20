@@ -2,6 +2,7 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { api, ApiError } from '@/api/client';
 import { checkNearby } from './nearby';
+import { checkNewPhotos } from '@/features/alerts';
 
 export const LOCATION_TASK = 'vybe-location-sharing';
 /** Requested cadence. Android may deliver less often (Doze, battery saver); the UI shows real age, not this. */
@@ -47,8 +48,17 @@ export async function uploadFix(loc: Location.LocationObject): Promise<'sent' | 
 }
 
 /** Every fix: upload it, then see whether a friend just came close (local notification). */
+let lastInboxCheck = 0;
 async function onFix(loc: Location.LocationObject) {
-  if ((await uploadFix(loc)) !== 'stopped') await checkNearby({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+  if ((await uploadFix(loc)) === 'stopped') return;
+  await checkNearby({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+  // The location service keeps Vybe alive in the background: use it to pick up messages and Blinks (and alert).
+  if (Date.now() - lastInboxCheck > 60_000) {
+    lastInboxCheck = Date.now();
+    // Lazy: the chat service loads the native encryption module, which tracking itself doesn't need.
+    await (await import('@/features/chat/service')).syncInbox().catch(() => {});
+    await checkNewPhotos();
+  }
 }
 
 // Must be defined at module scope so Android can run it headless after the app is killed.

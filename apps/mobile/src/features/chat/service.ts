@@ -1,6 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
 import { reportError, step } from '@/lib/report';
+import { alertMessage } from '@/features/alerts';
 import Signal, { type Bundle } from '@modules/vybe-signal';
 import { api, API_URL, ApiError, tokens } from '@/api/client';
 import { b64ToUtf8, utf8ToB64 } from '@/lib/bytes';
@@ -181,6 +182,10 @@ async function handleIncoming(m: Wire) {
     });
     return;
   }
+  // Alert for fresh messages only, so opening the app after a long time doesn't fire a burst of old ones.
+  const fresh = Date.now() - Date.parse(m.createdAt) < 30 * 60_000;
+  if (fresh && (payload.t === 'text' || payload.t === 'image' || payload.t === 'gif' || payload.t === 'sticker'))
+    void alertMessage(m.senderId, payload.t, payload.t === 'text' ? payload.body : null);
   const base = { peerId: m.senderId, fromMe: 0, replyTo: null, image: null, status: 'received' as const, createdAt: Date.parse(m.createdAt), deleted: 0 };
   switch (payload.t) {
     case 'text':

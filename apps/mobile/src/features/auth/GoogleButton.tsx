@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import Constants from 'expo-constants';
 import { Alert } from 'react-native';
-import { api } from '@/api/client';
+import { api, extraString } from '@/api/client';
 import type { AuthTokens } from '@/api/types';
 import { errorText } from '@/copy';
 import { deviceName, useSession } from '@/stores/session';
 import { Button } from '@/ui';
 
-const webClientId = Constants.expoConfig?.extra?.googleWebClientId as string | null;
+const webClientId = extraString('googleWebClientId');
 
 /** Rendered only when a Google OAuth client is configured for this build. The server verifies the ID token. */
 export function GoogleButton() {

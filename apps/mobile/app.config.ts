@@ -9,8 +9,8 @@ if (isRelease && (!apiUrl || !apiUrl.startsWith('https://'))) {
 
 // Bump VERSION (and android.versionCode) whenever native code changes: over-the-air updates only reach
 // APKs with the same runtime version, so a JS update can never land on incompatible native code.
-const VERSION = '0.1.1';
-const VERSION_CODE = 2;
+const VERSION = '0.1.2';
+const VERSION_CODE = 3;
 
 const config: ExpoConfig = {
   name: 'Vybe',
@@ -71,6 +71,14 @@ const config: ExpoConfig = {
           usesCleartextTraffic: !isRelease,
           extraMavenRepos: ['https://build-artifacts.signal.org/libraries/maven/'],
           packagingOptions: { exclude: ['**/libsignal_jni*.dylib', '**/signal_jni*.dll', '**/libsignal_jni_testing.so'] },
+          // libsignal's native code calls back into Java by exact class/method signature. Its bundled rules missed
+          // IdentityKeyStore$IdentityChange, so R8 renamed it and every first message failed at processBundle.
+          extraProguardRules: [
+            '-keep class org.signal.libsignal.** { *; }',
+            '-keep interface org.signal.libsignal.** { *; }',
+            '-keep enum org.signal.libsignal.** { *; }',
+            '-keep class expo.modules.vybesignal.** { *; }',
+          ].join('\n'),
         },
       },
     ],
@@ -89,8 +97,9 @@ const config: ExpoConfig = {
   experiments: { typedRoutes: true },
   extra: {
     apiUrl: apiUrl ?? 'http://10.0.2.2:3000',
-    googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? null,
-    supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? null,
+    // Leave unset values out entirely: OTA manifests turn null into {} (see extraString in src/api/client.ts).
+    ...(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID && { googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }),
+    ...(process.env.EXPO_PUBLIC_SUPPORT_EMAIL && { supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL }),
   },
 };
 

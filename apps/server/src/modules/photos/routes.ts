@@ -57,7 +57,7 @@ photosRouter.post('/photos', async (req, res) => {
     select: { id: true, createdAt: true },
   });
   for (const r of recipients) {
-    emit(r, { type: 'photo:new', data: { postId: post.id, senderId: me } });
+    emit(r, { type: 'photo:new', data: { postId: post.id, senderId: me, instant: !!body.instant } });
     void push(r, 'photos', { type: 'photo', postId: post.id });
   }
   res.status(201).json(post);

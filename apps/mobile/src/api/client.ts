@@ -1,7 +1,16 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
-export const API_URL: string = (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://10.0.2.2:3000';
+/**
+ * A string from app.config.ts `extra`, or null. Over-the-air manifests serialize null as `{}`, which once crashed
+ * the About screen ("Objects are not valid as a React child"), so anything that isn't a non-empty string is null.
+ */
+export function extraString(key: string): string | null {
+  const v = (Constants.expoConfig?.extra as Record<string, unknown> | undefined)?.[key];
+  return typeof v === 'string' && v ? v : null;
+}
+
+export const API_URL: string = extraString('apiUrl') ?? 'http://10.0.2.2:3000';
 const REFRESH_KEY = 'vybe.refreshToken';
 
 export class ApiError extends Error {

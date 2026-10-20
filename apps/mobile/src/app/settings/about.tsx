@@ -3,9 +3,10 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Card, ListItem, Screen, SectionTitle, Text } from '@/ui';
 import { space } from '@/theme';
+import { extraString } from '@/api/client';
 
 // Set EXPO_PUBLIC_SUPPORT_EMAIL per build; hidden until a real inbox exists.
-const support = Constants.expoConfig?.extra?.supportEmail as string | null;
+const support = extraString('supportEmail');
 
 export default function About() {
   const router = useRouter();
