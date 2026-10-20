@@ -40,6 +40,12 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - Server for all of the above is deployed (migrations `avatar_mood`, `backup_instants`). Verified by 64 server tests and 8 app tests; **none of the new screens has been exercised on a phone yet**.
 - Open issue: the About screen reportedly renders blank on the phone. It renders fine in a full-app Jest test; the error screen will report the real cause from the device.
 
+## 2026-10-20: chat root cause, 0.1.2
+- **Chat never sent: root cause found.** Phone reports showed every send failing in `processBundle`. Replaying the friend's real public bundle with desktop libsignal 0.105.1 worked, so the keys were fine. The release build's R8 mapping showed `IdentityKeyStore$IdentityChange -> ht2`: libsignal's bundled keep rules miss that type, so native code couldn't call back into `saveIdentity`. **Fix (needs APK 0.1.2):** `extraProguardRules` keep libsignal and the vybe-signal module. Native errors now include the cause.
+- **About / forgot crash fixed (OTA):** update manifests serialize null `extra` values as `{}`; the app now reads extras only when they're strings, and unset values are omitted.
+- **OTA to 0.1.1 (06:25 UTC):** local high-priority alerts (messages, photos, Blinks; the background location task also syncs), Instagram-style chat, vibe screen revamp, map top bar with one-tap Ghost Mode, Blink tab, Vybe map styles, hotspots, events, GIFs (GIPHY key set on the server).
+- **Not verified on a phone:** all of the above. Push while the app is fully closed and sharing is off still needs Firebase (FCM).
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
