@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
+import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { api, mediaSource } from '@/api/client';
@@ -10,6 +11,8 @@ import { Avatar, Button, EmptyState, ErrorState, Pill, Row, Screen, Skeleton, Te
 import { palette, radius, space, useColors } from '@/theme';
 
 type Page = { items: PhotoPost[]; nextCursor: string | null };
+
+const BANNER_KEY = 'vybe.banner.blink';
 
 export default function PhotosScreen() {
   const c = useColors();
@@ -24,11 +27,12 @@ export default function PhotosScreen() {
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <Screen padded={false} edges={['top']}>
+    <Screen ambient padded={false} edges={['top']}>
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>
         <Text variant="title" accessibilityRole="header">
-          Photos
+          Blink
         </Text>
+        <BlinkBanner onSend={() => router.push({ pathname: '/camera', params: { blink: '1' } })} />
         <Row style={{ marginVertical: space.md }} gap={space.sm}>
           {(['inbox', 'sent'] as const).map((t) => (
             <Pressable
@@ -64,9 +68,9 @@ export default function PhotosScreen() {
           ) : (
             <EmptyState
               emoji={tab === 'inbox' ? '📭' : '📤'}
-              title={tab === 'inbox' ? 'No photos yet' : 'You haven’t sent any photos'}
+              title={tab === 'inbox' ? 'No Blinks yet' : 'You haven’t sent any Blinks'}
               body={tab === 'inbox' ? 'When friends send you photos, they show up here.' : 'Snap something and send it to your friends.'}
-              action={<Button title="Open camera" kind="action" onPress={() => router.push('/camera')} />}
+              action={<Button title="Send a Blink" kind="action" onPress={() => router.push({ pathname: '/camera', params: { blink: '1' } })} />}
             />
           )
         }
@@ -100,5 +104,44 @@ export default function PhotosScreen() {
         )}
       />
     </Screen>
+  );
+}
+
+/** "Introducing Blink" banner at the top of the tab; dismissed for good with the ✕. */
+function BlinkBanner({ onSend }: { onSend: () => void }) {
+  const [hidden, setHidden] = useState(true);
+  useEffect(() => {
+    void SecureStore.getItemAsync(BANNER_KEY)
+      .then((v) => setHidden(v === '1'))
+      .catch(() => setHidden(false));
+  }, []);
+  if (hidden) return null;
+  return (
+    <View style={{ marginTop: space.md, borderRadius: radius.lg, backgroundColor: palette.grape500, padding: space.lg, gap: space.sm, overflow: 'hidden' }}>
+      <Text variant="label" color={palette.lime400}>
+        NEW · INTRODUCING BLINK ✨
+      </Text>
+      <Text variant="heading" color="#fff">
+        Your every moment, captured once.
+      </Text>
+      <Text variant="caption" color="#E4DCFF">
+        Snap it, send it to all your friends. Each friend can open it once, then it’s gone.
+      </Text>
+      <Row gap={space.sm} style={{ marginTop: space.xs }}>
+        <Button title="Send a Blink" kind="action" onPress={onSend} style={{ flex: 1 }} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Hide this banner"
+          hitSlop={12}
+          onPress={() => {
+            setHidden(true);
+            void SecureStore.setItemAsync(BANNER_KEY, '1').catch(() => {});
+          }}
+          style={{ padding: space.sm }}
+        >
+          <Text color="#fff">✕</Text>
+        </Pressable>
+      </Row>
+    </View>
   );
 }

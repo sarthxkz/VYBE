@@ -31,7 +31,7 @@ export default function RestoreChats() {
   };
 
   return (
-    <Screen edges={['top', 'bottom']}>
+    <Screen ambient edges={['top', 'bottom']}>
       <View style={{ flex: 1, justifyContent: 'center', gap: space.md }}>
         <Text variant="hero" accessibilityRole="header">
           {done === null ? 'Restore your chats' : 'Welcome back'}

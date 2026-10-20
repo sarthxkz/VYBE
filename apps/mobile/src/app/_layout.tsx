@@ -76,6 +76,7 @@ export default function RootLayout() {
             <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="send-photo" />
             <Stack.Screen name="restore-chats" options={{ presentation: 'modal', gestureEnabled: false }} />
+            <Stack.Screen name="event-new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="mood" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="invite/[username]" />
             <Stack.Screen name="friends" />

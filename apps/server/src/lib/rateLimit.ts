@@ -40,4 +40,5 @@ export const rl = {
   clientError: make(60_000, 10, 'ip'),
   backup: make(60 * 60_000, 30, 'user'),
   gifs: make(60_000, 120, 'user'),
+  events: make(60 * 60_000, 20, 'user'),
 };

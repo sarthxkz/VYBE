@@ -18,6 +18,7 @@ export async function runCleanup() {
   for (const { userId } of inactive) await withdrawLocation(userId);
 
   await db.encryptedMessage.deleteMany({ where: { createdAt: { lt: ago(MESSAGE_TTL_MS) } } });
+  await db.event.deleteMany({ where: { endsAt: { lt: ago(24 * 3600_000) } } });
 
   // Instants: delete once expired, or once every recipient opened it (after the view grace period).
   const instants = await db.photoPost.findMany({

@@ -48,6 +48,7 @@ export function RealtimeBridge() {
         inv('locations');
       }
       if (ev.type === 'photo:new') inv('photos');
+      if (ev.type === 'event:changed') inv('events');
       if (ev.type === 'presence') inv('friends');
       if (ev.type === 'location:update' || ev.type === 'location:removed') inv('locations');
     });

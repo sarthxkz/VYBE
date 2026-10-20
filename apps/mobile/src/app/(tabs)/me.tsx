@@ -16,7 +16,7 @@ export default function MeScreen() {
   );
 
   return (
-    <Screen scroll edges={['top']}>
+    <Screen ambient scroll edges={['top']}>
       <View style={{ alignItems: 'center', gap: space.xs, marginTop: space.xl }}>
         <Avatar mediaId={me?.avatarMediaId} look={me?.avatarStyle} name={me?.displayName ?? me?.username} size={96} ring={c.brand} />
         <Text variant="title">{me?.displayName ?? me?.username}</Text>

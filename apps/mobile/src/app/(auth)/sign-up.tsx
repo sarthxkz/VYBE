@@ -33,7 +33,7 @@ export default function SignUp() {
   };
 
   return (
-    <Screen scroll>
+    <Screen ambient scroll>
       <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.sm }}>
         Join Vybe
       </Text>

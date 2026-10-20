@@ -17,6 +17,7 @@ export type ServerEvent =
   | { type: 'friend:accepted'; data: { userId: string } }
   | { type: 'friend:removed'; data: { userId: string } }
   | { type: 'friend:mood'; data: { userId: string } }
+  | { type: 'event:changed'; data: { eventId: string } }
   | { type: 'photo:new'; data: { postId: string; senderId: string } }
   | { type: 'keys:changed'; data: { userId: string } }
   | { type: 'error'; data: { code: string } };

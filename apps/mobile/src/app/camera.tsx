@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from 'expo-camera';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { permission } from '@/copy';
@@ -12,6 +12,7 @@ import { palette, space } from '@/theme';
 
 export default function CameraScreen() {
   const router = useRouter();
+  const { blink } = useLocalSearchParams<{ blink?: string }>(); // forwarded so "Send a Blink" starts in Blink mode
   const cam = useRef<CameraView>(null);
   const [perm, requestPerm] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
@@ -48,7 +49,7 @@ export default function CameraScreen() {
             )
           }
         />
-        <Button title="Pick from gallery instead" kind="ghost" onPress={async () => { const img = await pickFromLibrary(); if (img) router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height } }); }} />
+        <Button title="Pick from gallery instead" kind="ghost" onPress={async () => { const img = await pickFromLibrary(); if (img) router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink } }); }} />
         <Button title="Close" kind="ghost" onPress={() => router.back()} />
       </Screen>
     );
@@ -65,7 +66,7 @@ export default function CameraScreen() {
     }
   };
 
-  const send = (img: Prepared) => router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height } });
+  const send = (img: Prepared) => router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink } });
 
   if (shot) {
     return (

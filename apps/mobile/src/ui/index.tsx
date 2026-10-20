@@ -18,6 +18,7 @@ import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { font, palette, radius, shadow, space, type as typeScale, useColors, type TypeVariant } from '@/theme';
 import { Character, type AvatarLook } from './character';
+import { Ambient } from './Ambient';
 import { mediaSource } from '@/api/client';
 
 export function Text({ variant = 'body', muted, color, style, ...p }: TextProps & { variant?: TypeVariant; muted?: boolean; color?: string }) {
@@ -31,17 +32,21 @@ export function Screen({
   edges = ['top', 'bottom'],
   style,
   padded = true,
+  ambient,
 }: {
   children: ReactNode;
   scroll?: boolean;
   edges?: Edge[];
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
+  /** Soft drifting brand glows behind the content (decorative). */
+  ambient?: boolean;
 }) {
   const c = useColors();
   const inner = [padded && { paddingHorizontal: space.xl }, style];
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: c.bg }}>
+      {ambient && <Ambient />}
       {scroll ? (
         <ScrollView contentContainerStyle={[{ paddingBottom: space.xxxl }, inner]} keyboardShouldPersistTaps="handled">
           {children}
@@ -126,7 +131,7 @@ export function Card({ children, style, onPress }: { children: ReactNode; style?
   const base = [styles.card, { backgroundColor: c.surface, borderColor: c.border }, style];
   if (!onPress) return <View style={base}>{children}</View>;
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.9 }]}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [base, pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] }]}>
       {children}
     </Pressable>
   );

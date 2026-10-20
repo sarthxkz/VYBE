@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FlatList, Switch, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,15 +15,23 @@ export default function SendPhoto() {
   const c = useColors();
   const router = useRouter();
   const qc = useQueryClient();
-  const { uri, w, h } = useLocalSearchParams<{ uri: string; w: string; h: string }>();
+  const { uri, w, h, blink } = useLocalSearchParams<{ uri: string; w: string; h: string; blink?: string }>();
   const friends = useFriends();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [caption, setCaption] = useState('');
-  const [instant, setInstant] = useState(false);
+  const [instant, setInstant] = useState(blink === '1');
   const [introBlink, setIntroBlink] = useState(false);
   const allIds = (friends.data?.friends ?? []).map((f) => f.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
   const selectAll = (on: boolean) => setSelected(new Set(on ? allIds : []));
+  // Started from "Send a Blink": everyone is selected once the friend list arrives.
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (blink === '1' && !preselected.current && allIds.length) {
+      preselected.current = true;
+      setSelected(new Set(allIds));
+    }
+  }, [blink, allIds]);
   const pickBlink = async (on: boolean) => {
     setInstant(on);
     if (on && selected.size === 0) selectAll(true); // Blinks go to everyone by default, like Instants

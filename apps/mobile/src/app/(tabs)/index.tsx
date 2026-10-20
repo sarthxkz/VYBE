@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Pressable, Text as RNText, useColorScheme, View } from 'react-native';
+import { Alert, AppState, FlatList, Linking, Pressable, Text as RNText, useColorScheme, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -7,8 +7,10 @@ import { Camera, Map, UserLocation, Marker, type CameraRef } from '@maplibre/map
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { api } from '@/api/client';
-import type { FriendLocation, LocationSettings, Mood, PublicUser } from '@/api/types';
+import { api, API_URL } from '@/api/client';
+import { hotspots } from '@/features/map/hotspots';
+import { Hotspot } from '@/features/map/Hotspot';
+import type { EventPin, FriendLocation, LocationSettings, Mood, PublicUser } from '@/api/types';
 import { useSession } from '@/stores/session';
 import { ago, freshness, permissionLevel, startTracking, type PermissionLevel } from '@/features/location/tracking';
 import { cluster } from '@/features/location/cluster';
@@ -16,7 +18,9 @@ import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } fro
 import { palette, radius, shadow, space, useColors } from '@/theme';
 
 // Free, keyless vector tiles (OpenFreeMap / OpenStreetMap). Attribution stays visible as the license requires.
-const MAP_STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
+// Vybe's own recoloured styles (scripts/make-map-style.mjs), served from our server so the look can change without
+// an app update; tiles still come from OpenFreeMap.
+const MAP_STYLE = { light: `${API_URL}/app/map/vybe-light.json`, dark: `${API_URL}/app/map/vybe-dark.json` };
 const MAP_THEME_KEY = 'vybe.map.theme';
 
 export default function MapScreen() {
@@ -27,6 +31,9 @@ export default function MapScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [perm, setPerm] = useState<PermissionLevel>('none');
   const [, tick] = useState(0);
+  const center = useRef<[number, number] | null>(null);
+  const [selEvent, setSelEvent] = useState<EventPin | null>(null);
+  const events = useQuery({ queryKey: ['events'], queryFn: () => api<{ events: EventPin[] }>('/events'), refetchInterval: 120_000 });
   const me = useSession((st) => st.me);
   const [myPos, setMyPos] = useState<[number, number] | null>(null);
   // Map theme: follows the phone until you pick one with the moon/sun button.
@@ -89,6 +96,7 @@ export default function MapScreen() {
     [friends.data],
   );
   const clusters = useMemo(() => cluster(located, zoom), [located, zoom]);
+  const hot = useMemo(() => hotspots(located), [located]);
   // No friends on the map yet: open on you rather than the whole country.
   const centered = useRef(false);
   useEffect(() => {
@@ -117,8 +125,14 @@ export default function MapScreen() {
         logo={false}
         attribution
         compass={false}
-        onRegionDidChange={(e) => setZoom(Math.round(e.nativeEvent.zoom))}
-        onPress={() => setSelected(null)}
+        onRegionDidChange={(e) => {
+          setZoom(Math.round(e.nativeEvent.zoom));
+          center.current = e.nativeEvent.center;
+        }}
+        onPress={() => {
+          setSelected(null);
+          setSelEvent(null);
+        }}
       >
         <Camera ref={camera} initialViewState={located[0] ? { center: [located[0].lng, located[0].lat], zoom: 11 } : { center: [78.9, 22.5], zoom: 3 }} />
         {perm !== 'none' && !myPos && <UserLocation />}
@@ -127,6 +141,16 @@ export default function MapScreen() {
             <Pin user={me} mood={me.mood} label="You" ring={c.brand} size={58} />
           </Marker>
         )}
+        {hot.map((h) => (
+          <Marker key={h.id} id={h.id} lngLat={[h.lng, h.lat]} anchor="center">
+            <Hotspot count={h.count} />
+          </Marker>
+        ))}
+        {(events.data?.events ?? []).map((ev) => (
+          <Marker key={ev.id} id={`event-${ev.id}`} lngLat={[ev.lng, ev.lat]} anchor="bottom" onPress={() => setSelEvent(ev)}>
+            <EventMarker ev={ev} />
+          </Marker>
+        ))}
         {clusters.map((cl) => {
           const one = cl.members.length === 1 ? cl.members[0]!.f : null;
           const ring = one ? (freshness(one.location!.receivedAt) === 'fresh' ? palette.lime400 : palette.amber500) : palette.grape500;
@@ -206,6 +230,18 @@ export default function MapScreen() {
       <View style={{ position: 'absolute', right: space.lg, bottom: 170, gap: space.sm }}>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Create an event here"
+          onPress={() => {
+            const [lng, lat] = center.current ?? myPos ?? [NaN, NaN];
+            if (Number.isNaN(lat)) return Alert.alert('Move the map first', 'Centre the map on where your event is.');
+            router.push({ pathname: '/event-new', params: { lat: String(lat), lng: String(lng) } });
+          }}
+          style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
+        >
+          <Ionicons name="calendar" size={22} color={c.link} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'}
           onPress={toggleTheme}
           style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
@@ -228,7 +264,9 @@ export default function MapScreen() {
       </View>
 
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: space.md }}>
-        {sel ? (
+        {selEvent ? (
+          <EventCard ev={selEvent} mine={selEvent.creator.id === me?.id} onClose={() => setSelEvent(null)} />
+        ) : sel ? (
           <Card style={{ marginHorizontal: space.lg }}>
             <Row>
               <Avatar mediaId={sel.user.avatarMediaId} look={sel.user.avatarStyle} name={sel.user.displayName ?? sel.user.username} size={52} />
@@ -327,5 +365,60 @@ function MoodLine({ mood, compact }: { mood: Mood; compact?: boolean }) {
     <Text variant="caption" muted numberOfLines={1} style={{ marginTop: compact ? 2 : space.xs }}>
       {mood.emoji} {mood.text ?? 'vibing'}
     </Text>
+  );
+}
+
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const isLive = (ev: EventPin) => Date.now() >= Date.parse(ev.startsAt);
+
+/** Event pin: emoji badge with a title tag, glowing while the event is on. */
+function EventMarker({ ev }: { ev: EventPin }) {
+  const c = useColors();
+  const live = isLive(ev);
+  return (
+    <View style={{ alignItems: 'center' }} accessibilityLabel={`Event: ${ev.title}, ${live ? 'happening now' : `starts ${timeOf(ev.startsAt)}`}`}>
+      <View style={[{ width: 46, height: 46, borderRadius: 14, backgroundColor: live ? palette.coral500 : palette.grape500, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff', transform: [{ rotate: '-6deg' }] }, shadow.float]}>
+        <RNText style={{ fontSize: 22 }}>{ev.emoji}</RNText>
+      </View>
+      <View style={[{ marginTop: 4, backgroundColor: c.surface, borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 2, maxWidth: 170 }, shadow.card]}>
+        <Text variant="caption" numberOfLines={1} style={{ fontWeight: '600' }}>
+          {ev.title} · {live ? 'now' : timeOf(ev.startsAt)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function EventCard({ ev, mine, onClose }: { ev: EventPin; mine: boolean; onClose: () => void }) {
+  const remove = () =>
+    Alert.alert('Remove this event?', 'Friends will no longer see it on the map.', [
+      { text: 'Keep it', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          await api(`/events/${ev.id}`, { method: 'DELETE' }).catch(() => {});
+          onClose();
+        },
+      },
+    ]);
+  return (
+    <Card style={{ marginHorizontal: space.lg }}>
+      <Row>
+        <RNText style={{ fontSize: 34 }}>{ev.emoji}</RNText>
+        <View style={{ flex: 1 }}>
+          <Text variant="heading" numberOfLines={1}>
+            {ev.title}
+          </Text>
+          <Text variant="caption" muted>
+            {isLive(ev) ? 'Happening now' : `Starts ${timeOf(ev.startsAt)}`} · until {timeOf(ev.endsAt)} · by {mine ? 'you' : (ev.creator.displayName ?? ev.creator.username)}
+          </Text>
+        </View>
+      </Row>
+      <Row style={{ marginTop: space.md }}>
+        <Button title="Directions" style={{ flex: 1 }} onPress={() => void Linking.openURL(`geo:${ev.lat},${ev.lng}?q=${ev.lat},${ev.lng}(${encodeURIComponent(ev.title)})`)} />
+        {mine ? <Button title="Remove" kind="danger" style={{ flex: 1 }} onPress={remove} /> : <Button title="Close" kind="secondary" style={{ flex: 1 }} onPress={onClose} />}
+      </Row>
+    </Card>
   );
 }

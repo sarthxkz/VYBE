@@ -71,7 +71,7 @@ export default function SetupProfile() {
   };
 
   return (
-    <Screen scroll>
+    <Screen ambient scroll>
       <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.sm }}>
         Make it yours
       </Text>

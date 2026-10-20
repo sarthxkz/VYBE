@@ -49,3 +49,6 @@ export type PhotoPost = {
 export type Session = { id: string; deviceName: string | null; createdAt: string; lastUsedAt: string; current: boolean };
 export type NotificationPrefs = { friendRequests: boolean; photos: boolean; messages: boolean; security: boolean };
 export type AuthTokens = { accessToken: string; refreshToken: string; expiresIn: number };
+
+/** A friend's event pin on the map. */
+export type EventPin = { id: string; title: string; emoji: string; lat: number; lng: number; startsAt: string; endsAt: string; creator: PublicUser };

@@ -1,4 +1,4 @@
-import { newerApk } from '../appUpdate';
+import { newerApk } from '../newerApk';
 
 const api = 'https://api.example';
 const apk = { versionCode: 3, versionName: '0.2.0', url: `${api}/app/android/vybe-0.2.0-3.apk` };

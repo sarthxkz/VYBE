@@ -23,7 +23,7 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Map', tabBarIcon: icon('map-outline', 'map') }} />
-      <Tabs.Screen name="photos" options={{ title: 'Photos', tabBarIcon: icon('images-outline', 'images') }} />
+      <Tabs.Screen name="photos" options={{ title: 'Blink', tabBarIcon: icon('flash-outline', 'flash') }} />
       <Tabs.Screen
         name="snap"
         options={{

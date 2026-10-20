@@ -32,7 +32,7 @@ export default function SignIn() {
   };
 
   return (
-    <Screen scroll>
+    <Screen ambient scroll>
       <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.xl }}>
         Welcome back
       </Text>

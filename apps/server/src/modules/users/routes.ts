@@ -107,14 +107,14 @@ usersRouter.patch('/me', async (req, res) => {
 });
 
 // One emoji (any skin tone / ZWJ sequence) plus an optional short line.
-const emoji = z
+export const oneEmoji = z
   .string()
   .max(16)
   .regex(/^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\u{200D}|\u{FE0F})+$/u, 'one emoji')
   .refine((e) => [...new Intl.Segmenter().segment(e)].length === 1, 'one emoji');
 
 usersRouter.put('/me/mood', async (req, res) => {
-  const body = parse(z.object({ emoji, text: z.string().trim().max(40).nullable().optional() }).strict(), req.body);
+  const body = parse(z.object({ emoji: oneEmoji, text: z.string().trim().max(40).nullable().optional() }).strict(), req.body);
   const me = uid(req);
   const u = await db.user.update({
     where: { id: me },

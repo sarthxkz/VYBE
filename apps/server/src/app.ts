@@ -20,6 +20,7 @@ import { adminRouter, reportsRouter } from './modules/reports/routes.js';
 import { telemetryRouter } from './modules/telemetry/routes.js';
 import { backupRouter } from './modules/backup/routes.js';
 import { gifsRouter } from './modules/gifs/routes.js';
+import { eventsRouter } from './modules/events/routes.js';
 
 export function createApp() {
   const app = express();
@@ -60,7 +61,7 @@ export function createApp() {
   const v1 = express.Router();
   v1.use('/auth', authRouter);
   v1.use(telemetryRouter); // before the routers that require auth for everything they see
-  for (const r of [backupRouter, gifsRouter, usersRouter, friendsRouter, locationsRouter, mediaRouter, photosRouter, keysRouter, messagesRouter, privacyRouter, reportsRouter, adminRouter])
+  for (const r of [backupRouter, gifsRouter, eventsRouter, usersRouter, friendsRouter, locationsRouter, mediaRouter, photosRouter, keysRouter, messagesRouter, privacyRouter, reportsRouter, adminRouter])
     v1.use(r);
   app.use('/v1', v1);
 

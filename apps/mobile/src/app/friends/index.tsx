@@ -15,7 +15,7 @@ export default function FriendsScreen() {
   const outgoing = requests.data?.outgoing ?? [];
 
   return (
-    <Screen edges={['bottom']}>
+    <Screen ambient edges={['bottom']}>
       <FlatList
         data={friends.data?.friends ?? []}
         keyExtractor={(f) => f.id}

@@ -45,7 +45,7 @@ export default function Forgot() {
   };
 
   return (
-    <Screen scroll>
+    <Screen ambient scroll>
       <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.sm }}>
         Reset your password
       </Text>

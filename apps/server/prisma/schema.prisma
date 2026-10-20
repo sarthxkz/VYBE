@@ -91,6 +91,7 @@ model User {
   reportsAgainst    Report[]           @relation("ReportTarget")
   moderationActions ModerationAction[] @relation("ModTarget")
   chatBackup        ChatBackup?
+  events            Event[]
 
   @@map("users")
 }
@@ -401,4 +402,21 @@ model ChatBackup {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("chat_backups")
+}
+
+/// A friend-made event pin on the map ("Party at Riya's · 8 PM"). Visible to the creator's friends until it ends.
+model Event {
+  id        String   @id @default(uuid()) @db.Uuid
+  creatorId String   @db.Uuid
+  title     String
+  emoji     String
+  lat       Float
+  lng       Float
+  startsAt  DateTime
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+  creator   User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, endsAt])
+  @@map("events")
 }
