@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSession } from '@/stores/session';
@@ -47,7 +47,17 @@ export default function MeScreen() {
         {item('Account security', 'Password and signed-in devices', '/settings/security', 'key')}
         {item('About & help', 'Support, legal, licenses', '/settings/about', 'information-circle')}
       </Card>
-      <Button title="Sign out" kind="ghost" style={{ marginTop: space.xl }} onPress={() => signOut()} />
+      <Button
+        title="Sign out"
+        kind="ghost"
+        style={{ marginTop: space.xl }}
+        onPress={() =>
+          Alert.alert('Sign out of Vybe?', 'Signing out removes your chats from this phone. If chat backup is on, you can restore them when you sign back in.', [
+            { text: 'Stay signed in', style: 'cancel' },
+            { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+          ])
+        }
+      />
     </Screen>
   );
 }

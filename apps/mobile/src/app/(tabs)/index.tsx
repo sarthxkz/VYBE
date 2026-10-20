@@ -3,7 +3,7 @@ import { AppState, FlatList, Pressable, Text as RNText, useColorScheme, View } f
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, Map, UserLocation, ViewAnnotation, type CameraRef } from '@maplibre/maplibre-react-native';
+import { Camera, Map, UserLocation, Marker, type CameraRef } from '@maplibre/maplibre-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -123,15 +123,15 @@ export default function MapScreen() {
         <Camera ref={camera} initialViewState={located[0] ? { center: [located[0].lng, located[0].lat], zoom: 11 } : { center: [78.9, 22.5], zoom: 3 }} />
         {perm !== 'none' && !myPos && <UserLocation />}
         {myPos && me && (
-          <ViewAnnotation id="me" lngLat={myPos} anchor="bottom" onPress={() => router.push('/mood')}>
+          <Marker id="me" lngLat={myPos} anchor="bottom" onPress={() => router.push('/mood')}>
             <Pin user={me} mood={me.mood} label="You" ring={c.brand} size={58} />
-          </ViewAnnotation>
+          </Marker>
         )}
         {clusters.map((cl) => {
           const one = cl.members.length === 1 ? cl.members[0]!.f : null;
           const ring = one ? (freshness(one.location!.receivedAt) === 'fresh' ? palette.lime400 : palette.amber500) : palette.grape500;
           return (
-            <ViewAnnotation
+            <Marker
               key={cl.id}
               id={cl.id}
               lngLat={[cl.lng, cl.lat]}
@@ -156,7 +156,7 @@ export default function MapScreen() {
                   </Text>
                 </View>
               )}
-            </ViewAnnotation>
+            </Marker>
           );
         })}
       </Map>
@@ -296,7 +296,11 @@ function FreshnessLine({ f, compact }: { f: FriendLocation; compact?: boolean })
   );
 }
 
-/** Map marker: the friend's character with a mood bubble and a name tag (Snapchat-style, Vybe colours). */
+/**
+ * Map marker: the friend's character with a mood bubble and a name tag (Snapchat-style, Vybe colours).
+ * Rendered in a live <Marker>: on Android, ViewAnnotation snapshots its view into a bitmap once, which
+ * dropped the SVG avatars and missed later changes ("avatars keep disappearing").
+ */
 function Pin({ user, mood, label, ring, size }: { user: PublicUser; mood?: Mood | null; label: string; ring: string; size: number }) {
   const c = useColors();
   return (

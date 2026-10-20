@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { reportError } from '@/lib/report';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import Signal from '@modules/vybe-signal';
@@ -52,8 +53,8 @@ export function RealtimeBridge() {
     });
 
     void (async () => {
-      await ensureKeys(me.id).catch(() => {});
-      await syncInbox().catch(() => {});
+      await ensureKeys(me.id).catch((e) => reportError('chat-keys', e));
+      await syncInbox().catch((e) => reportError('chat-sync', e));
       await retryUnsent().catch(() => {});
       if (await shouldOfferRestore((await conversations().catch(() => [])).length)) router.push('/restore-chats');
       await registerPush(false);

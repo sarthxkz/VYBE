@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { File, Paths } from 'expo-file-system';
+import { reportError, step } from '@/lib/report';
 import Signal, { type Bundle } from '@modules/vybe-signal';
 import { api, API_URL, ApiError, tokens } from '@/api/client';
 import { b64ToUtf8, utf8ToB64 } from '@/lib/bytes';
@@ -41,9 +42,9 @@ export async function ensureKeys(myUserId: string) {
 }
 
 async function startSession(peerId: string) {
-  const bundle = await api<Bundle>(`/keys/bundle/${peerId}`);
+  const bundle = await step('fetchBundle', () => api<Bundle>(`/keys/bundle/${peerId}`));
   await Signal.resetSession(peerId);
-  await Signal.processBundle(bundle);
+  await step('processBundle', () => Signal.processBundle(bundle));
   await kvSet(`reg:${peerId}`, String(bundle.registrationId));
 }
 
@@ -51,7 +52,7 @@ async function deliver(peerId: string, payload: Payload) {
   const plaintext = utf8ToB64(JSON.stringify(payload));
   for (let attempt = 0; attempt < 2; attempt++) {
     if (!(await Signal.hasSession(peerId)) || !(await kvGet(`reg:${peerId}`))) await startSession(peerId);
-    const enc = await Signal.encrypt(peerId, plaintext);
+    const enc = await step('encrypt', () => Signal.encrypt(peerId, plaintext));
     try {
       await api('/messages', {
         body: {
@@ -109,7 +110,8 @@ async function trySend(m: ChatMessage) {
   try {
     await deliver(m.peerId, payload);
     await setStatus(m.id, 'sent');
-  } catch {
+  } catch (e) {
+    reportError('chat-send', e);
     await setStatus(m.id, 'failed');
   }
 }
@@ -150,6 +152,7 @@ async function handleIncoming(m: Wire) {
     payload = JSON.parse(b64ToUtf8(await Signal.decrypt(m.senderId, m.type, m.body))) as Payload;
   } catch (e) {
     if ((e as { code?: string }).code === 'DUPLICATE') return; // already processed before a lost ack
+    reportError('chat-decrypt', e);
     await insertMessage({
       id: `sys-${m.id}`, peerId: m.senderId, fromMe: 0, kind: 'system', body: "A message couldn't be decrypted.",
       replyTo: null, image: null, status: 'received', createdAt: Date.parse(m.createdAt), deleted: 0,
