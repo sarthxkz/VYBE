@@ -4,7 +4,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { config } from '../../config.js';
 import { db } from '../../lib/db.js';
 import { audit } from '../../lib/audit.js';
-import { badRequest, forbidden, notFound, parse, unauthorized } from '../../lib/errors.js';
+import { badRequest, conflict, forbidden, notFound, parse, unauthorized } from '../../lib/errors.js';
 import { sendMail } from '../../lib/mail.js';
 import { rl } from '../../lib/rateLimit.js';
 import { disconnect } from '../../realtime.js';
@@ -59,14 +59,15 @@ async function consumeCode(userId: string, purpose: 'VERIFY' | 'RESET', code: st
 
 export const authRouter = Router();
 
-// Same response whether or not the email exists, so this cannot be used to enumerate accounts.
+// An email that already has a verified account is refused with EMAIL_TAKEN (product decision, 2026-10-20: a clear
+// "use sign in" beats a silent notice email). This reveals that the address is registered; the per-IP and per-email
+// rate limits keep that from being used for bulk enumeration. Unverified accounts just get a fresh code.
 authRouter.post('/register', rl.authIp, rl.authEmail, async (req, res) => {
   const body = parse(z.object({ email, password }), req.body);
   const existing = await db.user.findUnique({ where: { email: body.email } });
+  if (existing?.emailVerifiedAt) throw conflict('EMAIL_TAKEN');
   if (existing) {
-    if (!existing.emailVerifiedAt) await sendCode(existing.id, existing.email, 'VERIFY');
-    else
-      await sendMail(body.email, 'Vybe sign-up attempt', 'Someone tried to create a Vybe account with this email. If it was you, sign in or reset your password instead.');
+    await sendCode(existing.id, existing.email, 'VERIFY');
   } else {
     const user = await db.user.create({
       data: { email: body.email, passwordHash: await hashPassword(body.password), notificationPrefs: { create: {} }, locationSettings: { create: {} } },

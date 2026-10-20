@@ -34,7 +34,7 @@ photosRouter.post('/photos', async (req, res) => {
     z.object({
       mediaId: z.uuid(),
       caption: z.string().trim().max(200).optional(),
-      recipientIds: z.array(z.uuid()).min(1).max(50),
+      recipientIds: z.array(z.uuid()).min(1).max(500), // "all friends"
       instant: z.boolean().optional(),
     }),
     req.body,

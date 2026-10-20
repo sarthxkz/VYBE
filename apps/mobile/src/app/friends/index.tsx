@@ -26,7 +26,10 @@ export default function FriendsScreen() {
         }}
         ListHeaderComponent={
           <View>
-            <Button title="Add friends" kind="action" style={{ marginTop: space.md }} onPress={() => router.push('/friends/add')} />
+            <Row style={{ marginTop: space.md }}>
+              <Button title="Add friends" kind="action" style={{ flex: 1 }} onPress={() => router.push('/friends/add')} />
+              <Button title="Invite contacts" kind="secondary" style={{ flex: 1 }} onPress={() => router.push('/friends/invite')} />
+            </Row>
             {incoming.length > 0 && <SectionTitle>{`Requests (${incoming.length})`}</SectionTitle>}
             {incoming.map((r) => (
               <ListItem

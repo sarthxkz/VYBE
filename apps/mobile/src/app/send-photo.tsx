@@ -21,8 +21,13 @@ export default function SendPhoto() {
   const [caption, setCaption] = useState('');
   const [instant, setInstant] = useState(false);
   const [introBlink, setIntroBlink] = useState(false);
+  const allIds = (friends.data?.friends ?? []).map((f) => f.id);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const selectAll = (on: boolean) => setSelected(new Set(on ? allIds : []));
   const pickBlink = async (on: boolean) => {
     setInstant(on);
+    if (on && selected.size === 0) selectAll(true); // Blinks go to everyone by default, like Instants
+
     if (on && (await shouldIntroduceBlink())) setIntroBlink(true);
   };
   const [progress, setProgress] = useState<number | null>(null);
@@ -74,6 +79,13 @@ export default function SendPhoto() {
       <Text variant="caption" muted style={{ marginBottom: space.sm }}>
         Only the friends you pick can see this photo. Location data is removed before it’s sent.
       </Text>
+      {allIds.length > 1 && (
+        <ListItem
+          title="All friends"
+          subtitle={`Send to all ${allIds.length} friends`}
+          right={<Switch value={allSelected} onValueChange={selectAll} accessibilityLabel="Send to all friends" />}
+        />
+      )}
       <FlatList
         style={{ flex: 1 }}
         data={friends.data?.friends ?? []}

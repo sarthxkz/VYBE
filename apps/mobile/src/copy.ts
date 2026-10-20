@@ -38,6 +38,7 @@ export const errors: Record<string, string> = {
   INVALID_CODE: 'That code didn’t work. It may have expired. Request a new one and try again.',
   RATE_LIMITED: 'Too many tries. Take a short break and try again in a few minutes.',
   USERNAME_TAKEN: 'That username is taken. Try adding a number or an underscore.',
+  EMAIL_TAKEN: 'This email already has a Vybe account. Sign in instead, or reset your password if you forgot it.',
   ACCOUNT_SUSPENDED: 'This account is suspended. Contact support if you think this is a mistake.',
   VALIDATION_ERROR: 'Some details aren’t quite right. Check the highlighted fields.',
   USER_NOT_FOUND: 'We couldn’t find that person.',

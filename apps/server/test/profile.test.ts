@@ -105,3 +105,25 @@ describe('client error reports', () => {
     await api().post('/v1/client-errors').send({ message: 'x', token: 'secret' }).expect(400);
   });
 });
+
+describe('mail helpers', () => {
+  it('never logs codes and escapes HTML', async () => {
+    const { redact, html } = await import('../src/lib/mail.js');
+    expect(redact('Your Vybe code: 482913')).not.toContain('482913');
+    const h = html('Use 482913 to verify.\n\n<script>x</script>');
+    expect(h).toContain('<strong');
+    expect(h).not.toContain('<script>');
+  });
+});
+
+describe('usernames are one per person', () => {
+  it('refuses a username someone else has, in any letter case, and reports it as unavailable', async () => {
+    const [a, b] = await Promise.all([makeUser(), makeUser()]);
+    const res = await api().patch('/v1/me').set(b.auth).send({ username: a.username.toUpperCase() }).expect(409);
+    expect(res.body.error.code).toBe('USERNAME_TAKEN');
+    const avail = await api().get(`/v1/username-available?username=${a.username}`).set(b.auth).expect(200);
+    expect(avail.body.available).toBe(false);
+    // Your own current name counts as available to you (re-saving the profile is fine).
+    expect((await api().get(`/v1/username-available?username=${a.username}`).set(a.auth)).body.available).toBe(true);
+  });
+});

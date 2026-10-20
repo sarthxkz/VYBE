@@ -13,16 +13,19 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [taken, setTaken] = useState(false);
   const emailOk = /^\S+@\S+\.\S+$/.test(email.trim());
   const pwOk = password.length >= 10;
 
   const submit = async () => {
     setBusy(true);
     setError(null);
+    setTaken(false);
     try {
       await api('/auth/register', { auth: false, body: { email: email.trim(), password } });
       router.push({ pathname: '/verify', params: { email: email.trim().toLowerCase() } });
     } catch (e) {
+      setTaken((e as { code?: string }).code === 'EMAIL_TAKEN');
       setError(errorText(e));
     } finally {
       setBusy(false);
@@ -37,7 +40,7 @@ export default function SignUp() {
       <Text muted style={{ marginBottom: space.xl }}>
         Your location, photos and chats stay between you and your friends.
       </Text>
-      <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
+      <Input label="Email" value={email} onChangeText={(v) => { setEmail(v); setTaken(false); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
       <Input
         label="Password"
         value={password}
@@ -53,7 +56,11 @@ export default function SignUp() {
           {error}
         </Text>
       )}
-      <Button title="Create account" kind="action" loading={busy} disabled={!emailOk || !pwOk} onPress={submit} />
+      {taken ? (
+        <Button title="Sign in instead" kind="action" onPress={() => router.replace({ pathname: '/sign-in', params: { email: email.trim().toLowerCase() } })} />
+      ) : (
+        <Button title="Create account" kind="action" loading={busy} disabled={!emailOk || !pwOk} onPress={submit} />
+      )}
       <Text variant="caption" muted style={{ marginTop: space.md, textAlign: 'center' }}>
         By continuing you agree to the{' '}
         <Link href="/legal/terms" style={{ color: c.link }}>

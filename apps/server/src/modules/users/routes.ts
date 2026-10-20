@@ -23,7 +23,11 @@ export function withMood<T extends MoodCols>({ moodEmoji, moodText, moodSetAt, .
 // Each part is an index into the app's part list (apps/mobile/src/ui/character.tsx).
 const part = (max: number) => z.number().int().min(0).max(max);
 export const avatarStyleSchema = z
-  .object({ skin: part(7), face: part(3), hair: part(9), hairColor: part(9), eyes: part(5), mouth: part(5), accessory: part(5), outfit: part(9) })
+  .object({
+    skin: part(7), face: part(3), hair: part(9), hairColor: part(9), eyes: part(5), mouth: part(5), accessory: part(5), outfit: part(9),
+    // Added 2026-10-20; optional so avatars saved by older app versions stay valid.
+    brows: part(4).optional(), nose: part(3).optional(), facialHair: part(4).optional(), eyeColor: part(5).optional(), top: part(4).optional(),
+  })
   .strict();
 
 export type Relationship = 'self' | 'friends' | 'request_sent' | 'request_received' | 'none';

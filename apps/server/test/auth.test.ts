@@ -27,12 +27,13 @@ describe('registration and verification', () => {
     await api().get('/v1/me').set({ Authorization: `Bearer ${r.body.accessToken}` }).expect(200);
   });
 
-  it('does not reveal whether an email is registered', async () => {
+  it('refuses a second account on a registered email; forgot-password still reveals nothing', async () => {
     const u = await makeUser('taken');
     const a = await api().post('/v1/auth/register').send({ email: `${u.username}@test.local`, password: 'whatever12345' });
-    const b = await api().post('/v1/auth/register').send({ email: 'free@test.local', password: 'whatever12345' });
-    expect(a.status).toBe(b.status);
-    expect(a.body).toEqual(b.body);
+    expect(a.status).toBe(409);
+    expect(a.body.error.code).toBe('EMAIL_TAKEN');
+    await api().post('/v1/auth/register').send({ email: `TAKEN@test.local`, password: 'whatever12345' }).expect(409);
+    expect(await db.user.count({ where: { email: `${u.username}@test.local` } })).toBe(1);
     const f1 = await api().post('/v1/auth/forgot-password').send({ email: 'nobody@test.local' });
     const f2 = await api().post('/v1/auth/forgot-password').send({ email: `${u.username}@test.local` });
     expect(f1.status).toBe(f2.status);

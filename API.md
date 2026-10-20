@@ -7,7 +7,7 @@ Health: `GET /health` (process up), `GET /ready` (DB reachable). Both are unauth
 ## Auth `/auth`
 | Method | Path | Body | Notes |
 |---|---|---|---|
-| POST | `/auth/register` | `{email, password(10–128)}` | Always `202`. Sends a 6-digit code; an existing email gets a notice instead (no enumeration). |
+| POST | `/auth/register` | `{email, password(10–128)}` | `202` and a 6-digit code (also for an existing *unverified* account). `409 EMAIL_TAKEN` if the email already has a verified account (deliberate: clear UX over enumeration-safety; rate-limited per IP and per email). |
 | POST | `/auth/verify-email` | `{email, code, deviceName?}` | → `{accessToken, refreshToken, expiresIn}`. Max 5 attempts per code, 15-minute TTL. |
 | POST | `/auth/resend-verification` | `{email}` | `202` |
 | POST | `/auth/login` | `{email, password, deviceName?}` | `401 INVALID_CREDENTIALS` (same for unknown email, constant-time), `403 EMAIL_NOT_VERIFIED` |

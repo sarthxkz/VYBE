@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useRouter } from 'expo-router';
+import { Link, useRouter, useLocalSearchParams } from 'expo-router';
 import { api, ApiError } from '@/api/client';
 import type { AuthTokens } from '@/api/types';
 import { errorText } from '@/copy';
@@ -12,7 +12,7 @@ export default function SignIn() {
   const c = useColors();
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(useLocalSearchParams<{ email?: string }>().email ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

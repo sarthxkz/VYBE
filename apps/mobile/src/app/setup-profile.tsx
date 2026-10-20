@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Pressable, Switch, View } from 'react-native';
+import { Modal, Switch, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { errorText } from '@/copy';
 import { pickFromLibrary, uploadImage } from '@/lib/images';
 import { useSession } from '@/stores/session';
-import { Avatar, Button, Card, Input, Row, Screen, Text } from '@/ui';
+import { Avatar, Button, Card, Input, randomLook, Row, Screen, Text, type AvatarLook } from '@/ui';
+import { AvatarEditor } from '@/features/avatar/AvatarEditor';
 import { space, useColors } from '@/theme';
 
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
@@ -18,6 +19,9 @@ export default function SetupProfile() {
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [avatarId, setAvatarId] = useState<string | null>(me?.avatarMediaId ?? null);
+  // Everyone starts with a character; a photo replaces it if they pick one.
+  const [look, setLook] = useState<AvatarLook | null>(me?.avatarStyle ?? randomLook());
+  const [editing, setEditing] = useState(false);
   const [showPresence, setShowPresence] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,6 +49,7 @@ export default function SetupProfile() {
     setUploading(true);
     try {
       setAvatarId((await uploadImage(img, 'AVATAR')).id);
+      setLook(null);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -56,7 +61,7 @@ export default function SetupProfile() {
     setBusy(true);
     setError(null);
     try {
-      await api('/me', { method: 'PATCH', body: { username: name, displayName: displayName.trim() || name, bio: bio.trim() || null, avatarMediaId: avatarId, showPresence } });
+      await api('/me', { method: 'PATCH', body: { username: name, displayName: displayName.trim() || name, bio: bio.trim() || null, avatarMediaId: avatarId, avatarStyle: look, showPresence } });
       await refreshMe(); // username now set → the layout guard moves on to the app
     } catch (e) {
       setError(errorText(e));
@@ -73,12 +78,33 @@ export default function SetupProfile() {
       <Text muted style={{ marginBottom: space.xl }}>
         Friends find you by your username.
       </Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Choose profile photo" onPress={pickAvatar} style={{ alignSelf: 'center', marginBottom: space.xl, alignItems: 'center', gap: space.sm }}>
-        <Avatar mediaId={avatarId} name={displayName || name || '?'} size={104} ring={c.brand} />
-        <Text variant="label" color={c.link}>
-          {uploading ? 'Uploading…' : avatarId ? 'Change photo' : 'Add a photo'}
-        </Text>
-      </Pressable>
+      <View style={{ alignSelf: 'center', marginBottom: space.xl, alignItems: 'center', gap: space.sm }}>
+        <Avatar look={look} mediaId={avatarId} name={displayName || name || '?'} size={132} ring={c.brand} />
+        <Button title={look ? 'Create your avatar' : 'Make an avatar instead'} kind="secondary" onPress={() => setEditing(true)} />
+        <Button title={uploading ? 'Uploading…' : look ? 'Use a photo instead' : 'Change photo'} kind="ghost" disabled={uploading} onPress={pickAvatar} />
+      </View>
+      <Modal visible={editing} animationType="slide" onRequestClose={() => setEditing(false)}>
+        <Screen>
+          <Text variant="title" accessibilityRole="header" style={{ marginTop: space.md }}>
+            Your avatar
+          </Text>
+          <Text muted>This is you on the map. Change it any time.</Text>
+          <AvatarEditor
+            initial={look}
+            footer={(l) => (
+              <Button
+                title="Done"
+                kind="action"
+                onPress={() => {
+                  setLook(l);
+                  setAvatarId(null);
+                  setEditing(false);
+                }}
+              />
+            )}
+          />
+        </Screen>
+      </Modal>
       <Input
         label="Username"
         value={username}
