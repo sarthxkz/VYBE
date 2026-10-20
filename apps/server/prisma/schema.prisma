@@ -420,3 +420,13 @@ model Event {
   @@index([creatorId, endsAt])
   @@map("events")
 }
+
+/// Media links for GIFs seen in search results, so a chat message only needs to carry the short id.
+model GifMedia {
+  id        String   @id
+  small     String
+  full      String
+  createdAt DateTime @default(now())
+
+  @@map("gif_media")
+}

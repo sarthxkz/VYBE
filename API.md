@@ -102,11 +102,11 @@ Client → server: `{type:'typing', data:{to, on}}` (friends only, max 1/s), `{t
 ## Client errors
 `POST /client-errors` (no auth, 10/min/IP): `{message ≤500, stack? ≤4000, path?, version?, updateId?}` from the app's error screen. Logged at warn level.
 
-## GIFs 🔒 (GIPHY proxy, needs `GIPHY_API_KEY`)
+## GIFs 🔒 (KLIPY or GIPHY proxy, needs `KLIPY_API_KEY` or `GIPHY_API_KEY`)
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/gifs?q=&offset=` | Search (or trending without `q`). `→ {gifs:[{id,title,w,h}]}`. `503 GIFS_NOT_CONFIGURED` without a key. 120/min. |
-| GET | `/gifs/:id/small\|full` | The GIF bytes, fetched by the server from `media.giphy.com` (ids `[A-Za-z0-9]{4,40}` only). |
+| GET | `/gifs/:id/small\|full` | The GIF bytes, fetched by the server from the stored provider link (https on giphy.com/klipy.com only, no redirects; ids `[A-Za-z0-9]{4,40}`). |
 
 Chat payloads (inside the Signal-encrypted message, never visible to the server) also include `gif {gifId,w,h}`, `sticker <id>` and `react {target, emoji|null}`.
 
