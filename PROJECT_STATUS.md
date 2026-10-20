@@ -34,6 +34,12 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - **OTA update published for runtime 0.1.0** (router fix, new logo, animated intro). Verified from outside: protocol headers, the manifest signature verifies against `certs/ota-certificate.pem`, and the bundle and asset hashes match. **Not yet verified on a phone.**
 - **The new launcher icon needs a new APK** (icons are native resources); it's not built yet.
 
+## Release 0.1.1 (2026-10-20)
+- Built on the release PC (`assembleRelease`, arm64, signed with the release key `9d5d4bff…46ee65ac`) and published: https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.1-2.apk (`latest.json` versionCode 2). Phones on 0.1.0 see the in-app "Update available" banner.
+- Contains: avatars, moods, the Snapchat-style map with dark mode, contact invites, nearby alerts, encrypted chat backup, Blinks plus the Introducing Blink sheet, the error screen with crash reporting, and the new icon.
+- Server for all of the above is deployed (migrations `avatar_mood`, `backup_instants`). Verified by 64 server tests and 8 app tests; **none of the new screens has been exercised on a phone yet**.
+- Open issue: the About screen reportedly renders blank on the phone. It renders fine in a full-app Jest test; the error screen will report the real cause from the device.
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
