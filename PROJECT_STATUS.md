@@ -44,6 +44,7 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - **Chat never sent: root cause found.** Phone reports showed every send failing in `processBundle`. Replaying the friend's real public bundle with desktop libsignal 0.105.1 worked, so the keys were fine. The release build's R8 mapping showed `IdentityKeyStore$IdentityChange -> ht2`: libsignal's bundled keep rules miss that type, so native code couldn't call back into `saveIdentity`. **Fix (needs APK 0.1.2):** `extraProguardRules` keep libsignal and the vybe-signal module. Native errors now include the cause.
 - **About / forgot crash fixed (OTA):** update manifests serialize null `extra` values as `{}`; the app now reads extras only when they're strings, and unset values are omitted.
 - **OTA to 0.1.1 (06:25 UTC):** local high-priority alerts (messages, photos, Blinks; the background location task also syncs), Instagram-style chat, vibe screen revamp, map top bar with one-tap Ghost Mode, Blink tab, Vybe map styles, hotspots, events, GIFs (GIPHY key set on the server).
+- **0.1.2 built and published (17:34 IST):** R8 mapping confirms `IdentityKeyStore$IdentityChange` and `VybeProtocolStore` keep their names; signed with the release key; https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.2-3.apk (`latest.json` versionCode 3).
 - **Not verified on a phone:** all of the above. Push while the app is fully closed and sharing is off still needs Firebase (FCM).
 
 ## External blockers (need you)
