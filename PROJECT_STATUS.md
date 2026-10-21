@@ -47,6 +47,11 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - **0.1.2 built and published (17:34 IST):** R8 mapping confirms `IdentityKeyStore$IdentityChange` and `VybeProtocolStore` keep their names; signed with the release key; https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.2-3.apk (`latest.json` versionCode 3).
 - **Not verified on a phone:** all of the above. Push while the app is fully closed and sharing is off still needs Firebase (FCM).
 
+## 2026-10-21: second chat bug, Blinks, 0.1.3
+- **Chat still failed on 0.1.2, now with NO_SESSION at `encrypt`.** libsignal 0.105's `SessionCipher` takes `(store, local, remote)` but `SessionBuilder` takes `(store, remote, local)`. The module passed `(remote, local)` to both, so encrypt and decrypt looked up a session with ourselves. Verified with desktop libsignal (constructor parameter names from debug info), against the friend's real bundle, and in a full two-phone round trip. **Fix is native: APK 0.1.3** (prepared; built on the release PC).
+- **Blinks disappeared for the sender** because cleanup deleted them as soon as everyone had opened them. Now they stay until the 24 h expiry; recipients still get one view. The Sent tab shows "Opened x/y", and sending lands on Sent. Server deployed and OTA published for 0.1.2.
+- **Email:** logs show the last sign-up's code was accepted by Gmail and used 68 s later; delivery works, so anyone missing a code should check Spam/Promotions or the typed address.
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|
