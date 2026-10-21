@@ -51,6 +51,8 @@ node scripts/publish.mjs apk
 ```
 OTA updates only reach APKs with the same `VERSION` (runtime version), so JS that needs new native code never lands on an old APK. After publishing a new APK, publish OTA updates for the new version.
 
+**Build failed with `package com.vybe does not exist`?** Gradle reused a stale autolinking cache. Delete `apps/mobile/android/build/generated/autolinking` and `apps/mobile/android/app/build/generated/autolinking`, then build again (the package is `app.vybe`).
+
 ## Tests
 
 ```bash
