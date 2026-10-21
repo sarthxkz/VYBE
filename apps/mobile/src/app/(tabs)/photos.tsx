@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as SecureStore from 'expo-secure-store';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { api, mediaSource } from '@/api/client';
 import type { PhotoPost } from '@/api/types';
@@ -17,7 +17,9 @@ const BANNER_KEY = 'vybe.banner.blink';
 export default function PhotosScreen() {
   const c = useColors();
   const router = useRouter();
-  const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
+  // The selected tab lives in the route params, so "after sending, open Sent" and tapping a tab are one mechanism.
+  const tab = useLocalSearchParams<{ tab?: string }>().tab === 'sent' ? 'sent' : 'inbox';
+  const setTab = (t: 'inbox' | 'sent') => router.setParams({ tab: t });
   const q = useInfiniteQuery({
     queryKey: ['photos', tab],
     initialPageParam: null as string | null,
@@ -96,7 +98,13 @@ export default function PhotosScreen() {
                 <Text variant="caption" color="#fff" numberOfLines={1} style={{ flex: 1, textShadowColor: '#000', textShadowRadius: 4 }}>
                   {ago(item.createdAt)}
                 </Text>
-                {item.instant && tab === 'sent' && <Pill label="✨ Blink" color={palette.grape500} textColor="#fff" />}
+                {item.instant && tab === 'sent' && (
+                  <Pill
+                    label={`✨ Opened ${item.recipients?.filter((r) => r.viewedAt).length ?? 0}/${item.recipients?.length ?? 0}`}
+                    color={palette.grape500}
+                    textColor="#fff"
+                  />
+                )}
                 {tab === 'inbox' && !item.viewedAt && <Pill label="New" color={c.live} textColor="#14121F" />}
               </Row>
             </View>

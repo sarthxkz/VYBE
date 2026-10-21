@@ -154,7 +154,9 @@ class VybeSignalModule : Module() {
     AsyncFunction("encrypt") { userId: String, plaintextB64: String ->
       requireRegistered()
       try {
-        val msg = SessionCipher(store, address(userId), local()).encrypt(plaintextB64.unb64())
+        // libsignal 0.105: SessionCipher(store, LOCAL, remote) but SessionBuilder(store, REMOTE, local).
+        // Swapping these made encrypt look up a session with ourselves (NO_SESSION on every send).
+        val msg = SessionCipher(store, local(), address(userId)).encrypt(plaintextB64.unb64())
         mapOf("type" to msg.type, "body" to msg.serialize().b64())
       } catch (e: org.signal.libsignal.protocol.NoSessionException) {
         throw SignalError("NO_SESSION", "No session", e)
@@ -165,7 +167,7 @@ class VybeSignalModule : Module() {
 
     AsyncFunction("decrypt") { userId: String, type: Int, bodyB64: String ->
       requireRegistered()
-      val cipher = SessionCipher(store, address(userId), local())
+      val cipher = SessionCipher(store, local(), address(userId)) // (store, local, remote): see encrypt
       try {
         val out = when (type) {
           CiphertextMessage.PREKEY_TYPE -> cipher.decrypt(PreKeySignalMessage(bodyB64.unb64()))

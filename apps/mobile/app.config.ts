@@ -9,8 +9,8 @@ if (isRelease && (!apiUrl || !apiUrl.startsWith('https://'))) {
 
 // Bump VERSION (and android.versionCode) whenever native code changes: over-the-air updates only reach
 // APKs with the same runtime version, so a JS update can never land on incompatible native code.
-const VERSION = '0.1.2';
-const VERSION_CODE = 3;
+const VERSION = '0.1.3';
+const VERSION_CODE = 4;
 
 const config: ExpoConfig = {
   name: 'Vybe',

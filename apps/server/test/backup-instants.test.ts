@@ -46,7 +46,7 @@ describe('instants (view once)', () => {
     return { postId: p.body.id as string, mediaId: m.body.id as string };
   }
 
-  it('can be opened once, then disappears and its file is deleted', async () => {
+  it('opens once for the recipient, stays in the sender’s Sent until it expires, then the file is deleted', async () => {
     const [s, r] = await Promise.all([makeUser(), makeUser()]);
     await befriend(s, r);
     const { postId, mediaId } = await sendInstant(s, [r]);
@@ -62,6 +62,14 @@ describe('instants (view once)', () => {
     await api().get(`/v1/media/${mediaId}`).set(r.auth).expect(404);
     expect((await api().get('/v1/photos/inbox').set(r.auth)).body.items).toHaveLength(0);
 
+    // Everyone opened it, but the sender still sees it (with who opened it) until it expires.
+    await runCleanup();
+    const sent = await api().get('/v1/photos/sent').set(s.auth).expect(200);
+    expect(sent.body.items[0]).toMatchObject({ id: postId, instant: true });
+    expect(sent.body.items[0].recipients[0].viewedAt).not.toBeNull();
+    await api().get(`/v1/media/${mediaId}`).set(s.auth).expect(200);
+
+    await db.photoPost.update({ where: { id: postId }, data: { expiresAt: new Date(Date.now() - 1000) } });
     await runCleanup();
     expect(await db.photoPost.count({ where: { id: postId } })).toBe(0);
     expect(existsSync(mediaPath(mediaId))).toBe(false);

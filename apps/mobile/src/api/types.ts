@@ -44,6 +44,8 @@ export type PhotoPost = {
   media: { width: number | null; height: number | null };
   sender: PublicUser;
   viewedAt?: string | null;
+  /** Sent tab only: who it went to and whether they opened it. */
+  recipients?: { viewedAt: string | null }[];
 };
 
 export type Session = { id: string; deviceName: string | null; createdAt: string; lastUsedAt: string; current: boolean };

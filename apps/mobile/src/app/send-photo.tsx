@@ -57,7 +57,7 @@ export default function SendPhoto() {
       setMediaId(id);
       await api('/photos', { body: { mediaId: id, caption: instant ? undefined : caption.trim() || undefined, recipientIds: [...selected], instant } });
       void qc.invalidateQueries({ queryKey: ['photos'] });
-      router.replace('/photos');
+      router.replace({ pathname: '/photos', params: { tab: 'sent' } }); // show what you just sent
     } catch (e) {
       setError(errorText(e));
       setProgress(null);

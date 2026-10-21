@@ -1,7 +1,6 @@
 import { db } from './lib/db.js';
 import { logger } from './lib/logger.js';
 import { deleteMedia, unlinkMedia } from './lib/media.js';
-import { INSTANT_VIEW_GRACE_MS } from './lib/authz.js';
 import { LOCATION_MAX_AGE_MS, withdrawLocation } from './modules/locations/routes.js';
 import { MESSAGE_TTL_MS } from './modules/messages/routes.js';
 
@@ -20,15 +19,10 @@ export async function runCleanup() {
   await db.encryptedMessage.deleteMany({ where: { createdAt: { lt: ago(MESSAGE_TTL_MS) } } });
   await db.event.deleteMany({ where: { endsAt: { lt: ago(24 * 3600_000) } } });
 
-  // Instants: delete once expired, or once every recipient opened it (after the view grace period).
+  // Blinks (instants) go when they expire. Recipients already can't reopen one (canViewPhoto); deleting it as
+  // soon as everyone opened it also took it out of the sender's Sent tab, which read as "my Blink disappeared".
   const instants = await db.photoPost.findMany({
-    where: {
-      instant: true,
-      OR: [
-        { expiresAt: { lt: new Date() } },
-        { recipients: { every: { viewedAt: { lt: ago(INSTANT_VIEW_GRACE_MS) } } } },
-      ],
-    },
+    where: { instant: true, expiresAt: { lt: new Date() } },
     select: { mediaId: true },
     take: 1000,
   });
