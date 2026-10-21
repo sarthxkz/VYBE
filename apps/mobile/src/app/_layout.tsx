@@ -19,6 +19,7 @@ import { queryClient } from '@/lib/query';
 import { RealtimeBridge } from '@/features/RealtimeBridge';
 import { OfflineBanner } from '@/features/OfflineBanner';
 import { AppUpdateBanner } from '@/features/appUpdate';
+import { useOtaUpdates } from '@/features/otaUpdates';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -38,6 +39,7 @@ export default function RootLayout() {
   useEffect(() => {
     void useSession.getState().restore();
   }, []);
+  useOtaUpdates();
 
   const ready = fontsLoaded && status !== 'loading' && introSeen !== null;
   useEffect(() => {

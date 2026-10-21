@@ -89,7 +89,8 @@ const config: ExpoConfig = {
     ? {
         url: `${apiUrl}/ota/android/${VERSION}/manifest`,
         checkAutomatically: 'ON_LOAD',
-        fallbackToCacheTimeout: 0,
+        // Wait up to 4 s at launch for a new update so it applies on this launch (JS also re-checks on resume).
+        fallbackToCacheTimeout: 4000,
         codeSigningCertificate: './certs/ota-certificate.pem',
         codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },
       }
