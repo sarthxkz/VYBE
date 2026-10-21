@@ -6,6 +6,9 @@ import Signal, { type Bundle } from '@modules/vybe-signal';
 import { api, API_URL, ApiError, tokens } from '@/api/client';
 import { b64ToUtf8, utf8ToB64 } from '@/lib/bytes';
 import { subscribe } from '@/lib/realtime';
+import { queryClient } from '@/lib/query';
+import type { Friend } from '@/api/types';
+import { themeById } from './look';
 import { insertMessage, kvGet, kvSet, markDeleted, setReaction, setStatus, unsent, type ChatMessage } from './db';
 
 /**
@@ -19,7 +22,8 @@ export type Payload =
   | { v: 1; t: 'delete'; id: string; ts: number; target: string }
   | { v: 1; t: 'gif'; id: string; ts: number; gif: { gifId: string; w: number; h: number }; replyTo?: string }
   | { v: 1; t: 'sticker'; id: string; ts: number; sticker: string; replyTo?: string }
-  | { v: 1; t: 'react'; id: string; ts: number; target: string; emoji: string | null };
+  | { v: 1; t: 'react'; id: string; ts: number; target: string; emoji: string | null }
+  | { v: 1; t: 'theme'; id: string; ts: number; theme: string | null };
 
 const PREKEY_BATCH = 50;
 const PREKEY_LOW_WATER = 15;
@@ -92,6 +96,21 @@ export const sendSticker = (peerId: string, sticker: string, replyTo?: string) =
 export async function sendReaction(peerId: string, target: string, emoji: string | null) {
   await setReaction(target, peerId, 'mine', emoji);
   await deliver(peerId, { v: 1, t: 'react', id: Crypto.randomUUID(), ts: Date.now(), target, emoji }).catch((e) => reportError('chat-react', e));
+}
+
+/** Per-chat theme, shared with the other person like Instagram (encrypted; null = default). */
+export const chatTheme = async (peerId: string) => themeById(await kvGet(`theme:${peerId}`));
+
+async function applyTheme(peerId: string, id: string, theme: string | null, who: string, ts: number) {
+  await kvSet(`theme:${peerId}`, theme ?? '');
+  const body = `${who} changed the theme to ${themeById(theme)?.name ?? 'Default'}`;
+  await insertMessage({ id, peerId, fromMe: 0, kind: 'system', body, replyTo: null, image: null, status: 'received', createdAt: ts, deleted: 0 });
+}
+
+export async function sendTheme(peerId: string, theme: string | null) {
+  const id = Crypto.randomUUID();
+  await applyTheme(peerId, `theme-${id}`, theme, 'You', Date.now());
+  await deliver(peerId, { v: 1, t: 'theme', id, ts: Date.now(), theme }).catch((e) => reportError('chat-theme', e));
 }
 
 export async function sendText(peerId: string, body: string, replyTo?: string) {
@@ -210,6 +229,12 @@ async function handleIncoming(m: Wire) {
     case 'react':
       await setReaction(payload.target, m.senderId, 'theirs', payload.emoji ? String(payload.emoji).slice(0, 16) : null);
       break;
+    case 'theme': {
+      const f = queryClient.getQueryData<{ friends: Friend[] }>(['friends'])?.friends.find((x) => x.id === m.senderId);
+      const theme = themeById(payload.theme)?.id ?? null; // ignore ids this version doesn't know
+      await applyTheme(m.senderId, `theme-${payload.id}`, theme, f?.displayName ?? f?.username ?? 'They', Date.parse(m.createdAt));
+      break;
+    }
   }
 }
 
