@@ -20,3 +20,4 @@ apps/mobile/build-debug.log
 apps/mobile/modules/*/android/build/
 apps/graphify-out/
 apps/mobile/modules/*/android/.gradle/
+.vscode/
