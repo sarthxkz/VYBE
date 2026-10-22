@@ -56,7 +56,8 @@ const config: ExpoConfig = {
     ],
     ['expo-contacts', { contactsPermission: 'Pick friends from your contacts to invite. Contacts stay on your phone.' }],
     ['expo-camera', { cameraPermission: 'Vybe uses the camera so you can snap photos for friends.', recordAudioAndroid: false }],
-    ['expo-image-picker', { photosPermission: 'Pick a photo to send privately to friends.', microphonePermission: false }],
+    // No microphonePermission: false here: on Android that blocks RECORD_AUDIO for every package, which voice messages need.
+    ['expo-image-picker', { photosPermission: 'Pick a photo to send privately to friends.' }],
     ['expo-notifications', { color: '#6C4CF5' }],
     [
       'expo-audio',
