@@ -109,7 +109,7 @@ adminStatsRouter.get('/admin/overview', async (_req, res) => {
       uptimeSec: Math.round(process.uptime()),
       memory: { rss: mem.rss, heapUsed: mem.heapUsed, heapTotal: mem.heapTotal },
       host: { platform: `${os.type()} ${os.release()}`, cpus: os.cpus().length, load: os.loadavg(), freeMem: os.freemem(), totalMem: os.totalmem(), uptimeSec: Math.round(os.uptime()) },
-      push: !!config.FCM_SERVICE_ACCOUNT_PATH,
+      push: !!(config.FCM_SERVICE_ACCOUNT_B64 || config.FCM_SERVICE_ACCOUNT_PATH),
       mail: !!config.SMTP_URL,
       googleSignIn: config.GOOGLE_CLIENT_IDS.length > 0,
     },

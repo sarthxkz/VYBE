@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/api/client';
 import type { PublicUser, StoryFeed } from '@/api/types';
 import { useSession } from '@/stores/session';
-import { Appear, Avatar, Gradient, PressScale, Text } from '@/ui';
+import { Appear, Avatar, PressScale, SpinningGradient, Text } from '@/ui';
 import { gradient, space, useColors } from '@/theme';
 
 export const useStoryFeed = () => useQuery({ queryKey: ['stories', 'feed'], queryFn: () => api<StoryFeed>('/stories/feed'), refetchInterval: 60_000 });
@@ -18,7 +18,7 @@ export function StoryRing({ user, state, size = SIZE }: { user: Pick<PublicUser,
   const outer = size + 8;
   return (
     <View style={{ width: outer, height: outer, borderRadius: outer / 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: state === 'seen' ? c.border : 'transparent' }}>
-      {state === 'unseen' && <Gradient colors={gradient.sunset} />}
+      {state === 'unseen' && <SpinningGradient colors={gradient.sunset} />}
       <View style={{ padding: 2.5, borderRadius: outer / 2, backgroundColor: c.bg }}>
         <Avatar mediaId={user.avatarMediaId} look={user.avatarStyle} name={user.displayName ?? user.username} size={size - 3} />
       </View>

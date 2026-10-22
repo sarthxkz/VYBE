@@ -1,12 +1,9 @@
 import { Linking } from 'react-native';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
-import { Card, ListItem, Screen, SectionTitle, Text } from '@/ui';
-import { space } from '@/theme';
-import { extraString } from '@/api/client';
-
-// Set EXPO_PUBLIC_SUPPORT_EMAIL per build; hidden until a real inbox exists.
-const support = extraString('supportEmail');
+import { Card, IconTile, ListItem, Screen, SectionTitle, Text } from '@/ui';
+import { palette, space } from '@/theme';
+import { SUPPORT_EMAIL } from '@/features/help/assistant';
 
 export default function About() {
   const router = useRouter();
@@ -19,8 +16,9 @@ export default function About() {
       <Text style={{ marginTop: space.md }}>A private map for you and your friends: share your spot, snap photos, and chat with end-to-end encryption.</Text>
       <SectionTitle>Help</SectionTitle>
       <Card style={{ paddingVertical: 0 }}>
-        <ListItem title="Help & support" subtitle="Common questions and how to reach us" onPress={() => router.push('/legal/help')} />
-        {support ? <ListItem title="Contact support" subtitle={support} onPress={() => Linking.openURL(`mailto:${support}`)} /> : null}
+        <ListItem title="Chat with Vybe Assistant" subtitle="Instant answers, any time" left={<IconTile icon="sparkles" color={palette.grape500} />} onPress={() => router.push('/settings/assistant')} />
+        <ListItem title="Email support" subtitle={SUPPORT_EMAIL} left={<IconTile icon="mail" color={palette.coral600} />} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Vybe support')}`)} />
+        <ListItem title="Help articles" subtitle="Common questions, in one place" left={<IconTile icon="book" color={palette.sky500} />} onPress={() => router.push('/legal/help')} />
       </Card>
       <SectionTitle>Legal</SectionTitle>
       <Card style={{ paddingVertical: 0 }}>

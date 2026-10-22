@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
-import Animated, { cancelAnimation, FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming, ZoomIn } from 'react-native-reanimated';
+import Animated, { cancelAnimation, FadeIn, FadeInDown, FadeOut, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { StatusBar } from 'expo-status-bar';
 import { Image } from 'expo-image';
@@ -22,7 +22,7 @@ import { Sticker } from '@/features/chat/stickers';
 import { pickFromLibrary } from '@/lib/images';
 import { sendEvent, subscribe } from '@/lib/realtime';
 import { useSession } from '@/stores/session';
-import { Avatar, Row, Screen, Text, type AvatarLook } from '@/ui';
+import { Avatar, HeartBurst, Row, Screen, Text, type AvatarLook } from '@/ui';
 import { font, palette, radius, space, useColors, type ColorScheme } from '@/theme';
 
 const REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🔥'];
@@ -579,6 +579,7 @@ function Bubble({
   const c = useColors();
   const [img, setImg] = useState<string | null>(null);
   const [heart, setHeart] = useState(false);
+  const endHeart = useCallback(() => setHeart(false), []);
   const lastTap = useRef(0);
   const [fresh] = useState(() => Date.now() - m.createdAt < 4000);
   useEffect(() => {
@@ -651,7 +652,6 @@ function Bubble({
     if (now - lastTap.current < 300) {
       lastTap.current = 0;
       setHeart(true);
-      setTimeout(() => setHeart(false), 700);
       onDoubleTap();
     } else lastTap.current = now;
   };
@@ -678,11 +678,7 @@ function Bubble({
               {content}
             </View>
           )}
-          {heart && (
-            <Animated.Text entering={ZoomIn.springify()} exiting={FadeOut} style={{ position: 'absolute', alignSelf: 'center', top: '20%', fontSize: 44 }}>
-              ❤️
-            </Animated.Text>
-          )}
+          {heart && <HeartBurst size={64} onDone={endHeart} />}
           {reactions.length > 0 && (
             <View style={[{ position: 'absolute', bottom: -10, backgroundColor: c.surface, borderRadius: radius.pill, borderWidth: 2, borderColor: look.bg ? 'transparent' : c.bg, paddingHorizontal: 5, paddingVertical: 1 }, mine ? { left: -4 } : { right: -4 }]}>
               <RNText style={{ fontSize: 13 }}>{reactions.join('')}</RNText>

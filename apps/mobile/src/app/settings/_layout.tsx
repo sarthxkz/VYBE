@@ -24,7 +24,8 @@ export default function SettingsLayout() {
       <Stack.Screen name="profile" options={{ title: 'Edit profile' }} />
       <Stack.Screen name="avatar" options={{ title: 'Your avatar' }} />
       <Stack.Screen name="backup" options={{ title: 'Chat backup' }} />
-      <Stack.Screen name="about" options={{ title: 'About Vybe' }} />
+      <Stack.Screen name="about" options={{ title: 'About & help' }} />
+      <Stack.Screen name="assistant" options={{ title: 'Vybe Assistant' }} />
     </Stack>
   );
 }

@@ -17,6 +17,8 @@ const schema = z.object({
     .default('')
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
   FCM_SERVICE_ACCOUNT_PATH: z.string().optional(),
+  /** The same service-account JSON, base64-encoded, kept in .env (deploy/set-fcm.sh). Wins over the path. */
+  FCM_SERVICE_ACCOUNT_B64: z.string().optional(),
   // Optional: enables GIF search in chat (proxied; see modules/gifs). KLIPY wins if both are set.
   GIPHY_API_KEY: z.string().optional(),
   KLIPY_API_KEY: z.string().optional(),

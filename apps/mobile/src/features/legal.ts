@@ -49,8 +49,9 @@ export const docs: Record<string, Doc> = {
       { h: 'My friend’s spot looks old', p: 'Vybe asks for an update about every 2 minutes, but Android may delay updates when the phone is idle or in battery saver. The card always shows when the spot was last updated.' },
       { h: 'Sharing keeps stopping', p: 'Allow location “All the time” for Vybe and turn off battery optimization for Vybe in Android settings. You’ll see a notification while sharing is on.' },
       { h: 'Safety number changed', p: 'Your friend probably reinstalled Vybe or got a new phone. To be sure, compare safety numbers in person from the chat menu.' },
-      { h: 'I got a new phone', p: 'Sign in on the new phone. Your friends and photos are there; chat history stays on the old phone because only it has the keys.' },
+      { h: 'I got a new phone', p: 'Turn on Chat backup (You → Chat backup) on the old phone first. Sign in on the new phone and enter your backup password to restore your chats. Friends and photos are always there.' },
       { h: 'Someone is bothering me', p: 'Block them from their profile. They can’t find you, message you, send you photos or see your location. You can also report them.' },
+      { h: 'Still stuck?', p: 'Ask the Vybe Assistant in About & help for instant answers, or email supportadmin.vybe@gmail.com and include your app version (shown in About & help).' },
     ],
   },
   licenses: {

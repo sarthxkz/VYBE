@@ -13,17 +13,24 @@ const COPY: Record<Kind, { title: string; body: string }> = {
   security: { title: 'Vybe', body: 'Security alert on your account' },
 };
 
+// The app's channels (features/alerts.ts, features/notifications.ts): messages and photos ring at max importance.
+const CHANNEL: Record<Kind, string> = { messages: 'messages', photos: 'photos', friendRequests: 'default', security: 'default' };
+
 let messaging: import('firebase-admin/messaging').Messaging | null | undefined;
 
 async function fcm() {
   if (messaging !== undefined) return messaging;
-  if (!config.FCM_SERVICE_ACCOUNT_PATH) {
-    logger.warn('FCM_SERVICE_ACCOUNT_PATH not set; push notifications disabled');
+  const json = config.FCM_SERVICE_ACCOUNT_B64
+    ? Buffer.from(config.FCM_SERVICE_ACCOUNT_B64, 'base64').toString('utf8')
+    : config.FCM_SERVICE_ACCOUNT_PATH && readFileSync(config.FCM_SERVICE_ACCOUNT_PATH, 'utf8');
+  if (!json) {
+    logger.warn('No FCM service account set; push notifications disabled');
     return (messaging = null);
   }
   const { initializeApp, cert } = await import('firebase-admin/app');
   const { getMessaging } = await import('firebase-admin/messaging');
-  const app = initializeApp({ credential: cert(JSON.parse(readFileSync(config.FCM_SERVICE_ACCOUNT_PATH, 'utf8'))) });
+  const app = initializeApp({ credential: cert(JSON.parse(json)) });
+  logger.info('FCM push enabled');
   return (messaging = getMessaging(app));
 }
 
@@ -45,7 +52,7 @@ export async function push(userId: string, kind: Kind, data: Record<string, stri
     });
     for (const s of sessions) {
       await m
-        .send({ token: s.pushToken!, notification: COPY[kind], data: { kind, ...data }, android: { priority: 'high' } })
+        .send({ token: s.pushToken!, notification: COPY[kind], data: { kind, ...data }, android: { priority: 'high', notification: { channelId: CHANNEL[kind], sound: 'default', defaultVibrateTimings: true } } })
         .catch(async (err: { code?: string }) => {
           // Token rotated or app uninstalled: forget it.
           if (err.code === 'messaging/registration-token-not-registered' || err.code === 'messaging/invalid-argument') {

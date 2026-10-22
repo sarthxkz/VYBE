@@ -137,6 +137,8 @@ export const motion = {
   snappy: { damping: 20, stiffness: 260, mass: 0.8 },
   gentle: { damping: 18, stiffness: 140, mass: 1 },
   bouncy: { damping: 10, stiffness: 220, mass: 0.7 },
+  /** Entrances: stiff and quick to settle, with a hint of overshoot. */
+  pop: { damping: 17, stiffness: 380, mass: 0.7 },
   fast: 160,
   base: 260,
   slow: 420,

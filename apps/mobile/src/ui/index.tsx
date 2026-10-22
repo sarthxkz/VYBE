@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text as RNText,
   TextInput,
+  useColorScheme,
   View,
   type LayoutChangeEvent,
   type PressableProps,
@@ -22,7 +23,7 @@ import Animated, { interpolate, interpolateColor, useAnimatedStyle, useReducedMo
 import { font, gradient, motion, palette, radius, shadow, space, type as typeScale, useColors, type TypeVariant } from '@/theme';
 import { Character, type AvatarLook } from './character';
 import { Ambient } from './Ambient';
-import { Appear, Float, Gradient, PressScale, useBreathe } from './motion';
+import { Appear, Float, Gradient, PressScale, Shimmer } from './motion';
 import { mediaSource } from '@/api/client';
 
 export function Text({ variant = 'body', muted, color, style, ...p }: TextProps & { variant?: TypeVariant; muted?: boolean; color?: string }) {
@@ -266,9 +267,12 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry?: (
 /** Loading placeholder that breathes, so a wait reads as "working" rather than "broken". */
 export function Skeleton({ height = 64, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
   const c = useColors();
-  const t = useBreathe();
-  const anim = useAnimatedStyle(() => ({ opacity: 0.55 + 0.45 * t.value }));
-  return <Animated.View accessibilityElementsHidden style={[{ height, borderRadius: radius.md, backgroundColor: c.surfaceAlt, marginBottom: space.md }, anim, style]} />;
+  const dark = useColorScheme() === 'dark';
+  return (
+    <View accessibilityElementsHidden style={[{ height, borderRadius: radius.md, backgroundColor: c.surfaceAlt, marginBottom: space.md, overflow: 'hidden' }, style]}>
+      <Shimmer color={dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)'} />
+    </View>
+  );
 }
 
 export function Row({ children, style, gap = space.md }: { children: ReactNode; style?: StyleProp<ViewStyle>; gap?: number }) {
@@ -405,4 +409,4 @@ const styles = StyleSheet.create({
   },
 });
 export { Character, randomLook, PART_COUNTS, type AvatarLook } from './character';
-export { Appear, Float, Glow, Gradient, PressScale, PulseRing, TypingDots, useBreathe } from './motion';
+export { Appear, Float, Glow, Gradient, HeartBurst, PressScale, PulseRing, Shimmer, SpinningGradient, TypingDots, useBreathe } from './motion';

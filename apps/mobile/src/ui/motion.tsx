@@ -1,8 +1,7 @@
-import { useEffect, useId, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text as RNText, View, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
-  FadeInDown,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -54,17 +53,113 @@ export function PressScale({
   );
 }
 
-/** Rises and fades in on mount. `index` staggers siblings; the delay is capped so long lists don't wait. */
+/**
+ * Pops in on mount: a short rise with a slight scale-up on a stiff spring, the crisp entrance social apps use
+ * (a slow drift reads as sluggish). `index` staggers siblings; the delay is capped so long lists don't wait.
+ */
 export function Appear({ children, index = 0, delay = 0, style }: { children: ReactNode; index?: number; delay?: number; style?: StyleProp<ViewStyle> }) {
+  const d = delay + Math.min(index, 8) * motion.stagger;
+  const entering = () => {
+    'worklet';
+    return {
+      initialValues: { opacity: 0, transform: [{ translateY: 16 }, { scale: 0.96 }] },
+      animations: {
+        opacity: withDelay(d, withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) })),
+        transform: [{ translateY: withDelay(d, withSpring(0, motion.pop)) }, { scale: withDelay(d, withSpring(1, motion.pop)) }],
+      },
+    };
+  };
   return (
-    <Animated.View
-      entering={FadeInDown.delay(delay + Math.min(index, 10) * motion.stagger)
-        .springify()
-        .damping(motion.snappy.damping)
-        .stiffness(motion.snappy.stiffness)}
-      style={style}
-    >
+    <Animated.View entering={entering} style={style}>
       {children}
+    </Animated.View>
+  );
+}
+
+/** Instagram-style loading shimmer: a soft highlight sweeping across the placeholder. */
+export function Shimmer({ color = 'rgba(255,255,255,0.45)' }: { color?: string }) {
+  const reduced = useReducedMotion();
+  const [w, setW] = useState(0);
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (reduced || !w) return;
+    t.value = withRepeat(withTiming(1, { duration: 1150, easing: Easing.inOut(Easing.quad) }), -1, false);
+  }, [t, w, reduced]);
+  const band = useAnimatedStyle(() => ({ transform: [{ translateX: -w + t.value * w * 2 }] }));
+  const id = `s${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {w > 0 && !reduced && (
+        <Animated.View style={[{ width: w, height: '100%' }, band]}>
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0.2" stopColor={color} stopOpacity={0} />
+                <Stop offset="0.5" stopColor={color} stopOpacity={1} />
+                <Stop offset="0.8" stopColor={color} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill={`url(#${id})`} />
+          </Svg>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+/** Slowly turning gradient ring layer (unseen stories). Put it inside a round, overflow-hidden parent. */
+export function SpinningGradient({ colors, duration = 3200 }: { colors: readonly [string, string]; duration?: number }) {
+  const reduced = useReducedMotion();
+  const t = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    t.value = withRepeat(withTiming(1, { duration, easing: Easing.linear }), -1, false);
+  }, [t, duration, reduced]);
+  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${t.value * 360}deg` }] }));
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, spin]}>
+      <Gradient colors={colors} />
+    </Animated.View>
+  );
+}
+
+const BURST = [0, 60, 120, 180, 240, 300];
+
+/**
+ * Double-tap like: a big heart springs up past full size, settles, floats off, while small hearts burst
+ * outward. Calls onDone when finished so the parent can unmount it.
+ */
+export function HeartBurst({ size = 72, onDone }: { size?: number; onDone?: () => void }) {
+  const reduced = useReducedMotion();
+  const pop = useSharedValue(0);
+  const fly = useSharedValue(0);
+  useEffect(() => {
+    pop.value = reduced ? 1 : withSequence(withSpring(1.25, { damping: 7, stiffness: 320, mass: 0.6 }), withSpring(1, motion.press), withDelay(260, withTiming(0, { duration: 220 })));
+    fly.value = reduced ? 1 : withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
+    const t = setTimeout(() => onDone?.(), reduced ? 500 : 1000);
+    return () => clearTimeout(t);
+  }, [pop, fly, reduced, onDone]);
+  const big = useAnimatedStyle(() => ({ opacity: Math.min(1, pop.value * 1.5), transform: [{ scale: pop.value }, { translateY: -12 * fly.value }] }));
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
+      {!reduced && BURST.map((deg) => <Particle key={deg} deg={deg} t={fly} distance={size * 0.9} />)}
+      <Animated.View style={big}>
+        <RNText style={{ fontSize: size * 0.8 }}>❤️</RNText>
+      </Animated.View>
+    </View>
+  );
+}
+
+function Particle({ deg, t, distance }: { deg: number; t: { value: number }; distance: number }) {
+  const rad = (deg * Math.PI) / 180;
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    opacity: t.value < 0.15 ? t.value / 0.15 : 1 - t.value,
+    transform: [{ translateX: Math.cos(rad) * distance * t.value }, { translateY: Math.sin(rad) * distance * t.value }, { scale: 0.4 + 0.6 * (1 - t.value) }],
+  }));
+  return (
+    <Animated.View style={style}>
+      <RNText style={{ fontSize: 16 }}>💖</RNText>
     </Animated.View>
   );
 }
