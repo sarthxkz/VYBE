@@ -93,3 +93,9 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 9. Reinstall one side → the other side shows "safety number changed".
 10. Delete account → can't sign in; the friend loses the card.
 11. TalkBack pass over intro, sign-in, map, chat; large font scale; small (5") and large (6.7") screens.
+
+## 0.1.5 (2026-10-22): push, assistant, motion
+- **Push notifications (FCM):** Firebase project `vybe-28c30`. Server key stored base64 in the VM `.env` by `deploy/set-fcm.sh` and confirmed accepted by Google; pushes use the app's `messages`/`photos` channels. The APK carries `google-services.json` (kept outside the repo in `~/.vybe`). Push copy stays generic ("New message"). **Not yet confirmed on a phone.**
+- **Vybe Assistant** (About & help): on-device FAQ chat with an "Email support" hand-off to supportadmin.vybe@gmail.com.
+- **Motion:** crisp pop-in entrances, shimmer placeholders, spinning ring on unseen stories, double-tap heart burst, Snapchat-style shutter with white flash, story push-in zoom. Stories tray on the map. Admin dashboard shortcut on the You tab for ADMIN accounts.
+- **APK 0.1.5 (code 6) published:** https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.5-6.apk, release key `9d5d4bff…`, `c2dm.RECEIVE` + Firebase resources present, libsignal names kept. OTA channel 0.1.5 live; the motion/assistant JS was also sent to 0.1.4.
