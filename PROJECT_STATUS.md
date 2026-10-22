@@ -62,6 +62,8 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - **Stories**: tray at the top of Chats, a full-screen viewer (tap to step, hold to pause, swipe down to close), "Seen by" for your own stories, delete. Server: `stories` and `story_views` tables (migration `20261022120000_stories`), friends-only authorization, a 24 h expiry enforced by the cleanup job, included in the data export.
 - **Admin panel** at `/admin/` (see DEPLOYMENT.md): health, storage, usage, crashes, and the reports queue. Admin accounts come from `dist/cli/make-admin.js`.
 - Verified on this PC: app `tsc` ✅, `expo lint` ✅ (0 problems), `jest` ✅ 8/8; server `tsc` ✅, `eslint` ✅. **Not run here:** the server test suite (no Postgres on this PC; 7 new tests in `test/stories-admin.test.ts`) and anything on a phone.
+- **Merged with the 0.1.3 line and published (2026-10-22):** conflicts resolved keeping both sides (the newer chat screen with themes, reactions, GIFs and presence, plus voice; Ghost toggle on the map; Blink tab). `expo-image-picker`'s `microphonePermission: false` was blocking `RECORD_AUDIO` for every package, so it was removed. Server tests ✅ 79/79 (Postgres in Docker); server deployed with the stories migration; `/v1/admin/overview` and `/v1/stories` return 401 without sign-in.
+- **APK 0.1.4 (code 5) published:** https://api.161-153-37-106.sslip.io/app/android/vybe-0.1.4-5.apk, signed with the release key, `RECORD_AUDIO` present, libsignal classes keep their names. OTA channel 0.1.4 is live. **Not tested on a phone yet.** No admin account exists until `make-admin` is run on the VM.
 
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
