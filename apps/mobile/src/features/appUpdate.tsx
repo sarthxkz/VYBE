@@ -2,21 +2,13 @@ import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
 import * as Application from 'expo-application';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { Button, Text } from '@/ui';
 import { palette, radius, space } from '@/theme';
 import { API_URL } from '@/api/client';
+import { newerApk, type LatestApk } from './appUpdateCheck';
 
-// Native updates (a new APK). JS-only changes arrive silently through expo-updates instead.
-// Published by scripts/publish-apk.mjs as /app/android/latest.json on the API host.
-export type LatestApk = { versionCode: number; versionName: string; url: string };
-
-/** Returns the newer APK, or null. Only accepts an https URL on our own API host. */
-export function newerApk(data: unknown, currentVersionCode: number, apiUrl = API_URL): LatestApk | null {
-  const d = data as Partial<LatestApk> | null;
-  if (!d || typeof d.versionCode !== 'number' || typeof d.url !== 'string' || typeof d.versionName !== 'string') return null;
-  if (!d.url.startsWith(`${apiUrl}/app/android/`) || !apiUrl.startsWith('https://')) return null;
-  return d.versionCode > currentVersionCode ? (d as LatestApk) : null;
-}
+export { newerApk, type LatestApk };
 
 export function AppUpdateBanner() {
   const insets = useSafeAreaInsets();
@@ -33,8 +25,10 @@ export function AppUpdateBanner() {
 
   if (!latest) return null;
   return (
-    <View
+    <Animated.View
       accessibilityRole="alert"
+      entering={SlideInDown.springify().damping(18)}
+      exiting={FadeOutDown}
       style={{ position: 'absolute', left: space.md, right: space.md, bottom: insets.bottom + space.md, zIndex: 100, backgroundColor: palette.ink, borderRadius: radius.lg, padding: space.md, gap: space.sm }}
     >
       <Text variant="label" color="#fff">
@@ -44,6 +38,6 @@ export function AppUpdateBanner() {
         <Button title="Download update" onPress={() => void Linking.openURL(latest.url)} style={{ flex: 1 }} />
         <Button title="Later" kind="secondary" onPress={() => setLatest(null)} />
       </View>
-    </View>
+    </Animated.View>
   );
 }

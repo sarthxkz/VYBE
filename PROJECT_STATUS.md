@@ -40,6 +40,15 @@ _Last updated: 2026-10-19._ Legend: ✅ done and verified by automated tests or 
 - Server for all of the above is deployed (migrations `avatar_mood`, `backup_instants`). Verified by 64 server tests and 8 app tests; **none of the new screens has been exercised on a phone yet**.
 - Open issue: the About screen reportedly renders blank on the phone. It renders fine in a full-app Jest test; the error screen will report the real cause from the device.
 
+## 0.1.2 in progress (2026-10-22): UI revamp, voice, stories, admin panel
+- **UI and motion revamp** (JS only): spring press feedback on every button, card and row; staggered entrances; a floating tab bar with a gliding highlight and a gradient camera button; a segmented control; breathing skeletons; animated focus on text fields with a show/hide-password toggle; a gradient profile card; iOS-style screen transitions; animated offline and update banners. Respects the system's reduced-motion setting. Map pins stay static on purpose (Android draws ViewAnnotations into a bitmap).
+- **Voice messages**: hold the mic to record, slide left to cancel, release to send; live waveform while recording; playback with a seekable waveform and 1×/1.5×/2× speed. Audio is AES-256-GCM encrypted on the phone and sent as a chat blob, so the server stores ciphertext only (no server change). **Needs a new APK** (expo-audio and the `RECORD_AUDIO` permission, which was previously blocked), hence the version bump to 0.1.2 (code 3).
+- **Seen receipts**: the newest message you sent shows Sending… / Sent / Delivered / Seen, using the existing encrypted read receipts.
+- **Silent shutter**: photos are taken with `shutterSound: false` (the on-screen flash stays).
+- **Stories**: tray at the top of Chats, a full-screen viewer (tap to step, hold to pause, swipe down to close), "Seen by" for your own stories, delete. Server: `stories` and `story_views` tables (migration `20261022120000_stories`), friends-only authorization, a 24 h expiry enforced by the cleanup job, included in the data export.
+- **Admin panel** at `/admin/` (see DEPLOYMENT.md): health, storage, usage, crashes, and the reports queue. Admin accounts come from `dist/cli/make-admin.js`.
+- Verified on this PC: app `tsc` ✅, `expo lint` ✅ (0 problems), `jest` ✅ 8/8; server `tsc` ✅, `eslint` ✅. **Not run here:** the server test suite (no Postgres on this PC; 7 new tests in `test/stories-admin.test.ts`) and anything on a phone.
+
 ## External blockers (need you)
 | Blocker | Unblocks | What to provide |
 |---|---|---|

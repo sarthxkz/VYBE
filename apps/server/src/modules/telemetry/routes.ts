@@ -8,6 +8,9 @@ import { rl } from '../../lib/rateLimit.js';
 // No auth on purpose (crashes happen on sign-in screens too); small, rate-limited, length-capped, no user content.
 export const telemetryRouter = Router();
 
+/** The latest crash reports, newest first, for the admin panel. In memory only: lost on restart, never persisted. */
+export const recentClientErrors: { at: string; message: string; path?: string; version?: string; updateId?: string }[] = [];
+
 telemetryRouter.post('/client-errors', rl.clientError, (req, res) => {
   const body = parse(
     z
@@ -22,5 +25,8 @@ telemetryRouter.post('/client-errors', rl.clientError, (req, res) => {
     req.body,
   );
   logger.warn({ clientError: body }, 'client error');
+  const { stack: _stack, ...summary } = body;
+  recentClientErrors.unshift({ at: new Date().toISOString(), ...summary });
+  recentClientErrors.length = Math.min(recentClientErrors.length, 50);
   res.status(204).end();
 });

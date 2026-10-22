@@ -19,6 +19,8 @@ import { privacyRouter } from './modules/privacy/routes.js';
 import { adminRouter, reportsRouter } from './modules/reports/routes.js';
 import { telemetryRouter } from './modules/telemetry/routes.js';
 import { backupRouter } from './modules/backup/routes.js';
+import { storiesRouter } from './modules/stories/routes.js';
+import { adminPanelEnabled, adminPanelRouter, adminStatsRouter } from './modules/admin/routes.js';
 
 export function createApp() {
   const app = express();
@@ -54,12 +56,13 @@ export function createApp() {
   });
 
   app.use(rl.global);
+  if (adminPanelEnabled) app.use(adminPanelRouter);
   app.use(express.json({ limit: '1mb' }));
 
   const v1 = express.Router();
   v1.use('/auth', authRouter);
   v1.use(telemetryRouter); // before the routers that require auth for everything they see
-  for (const r of [backupRouter, usersRouter, friendsRouter, locationsRouter, mediaRouter, photosRouter, keysRouter, messagesRouter, privacyRouter, reportsRouter, adminRouter])
+  for (const r of [backupRouter, usersRouter, friendsRouter, locationsRouter, mediaRouter, photosRouter, storiesRouter, keysRouter, messagesRouter, privacyRouter, reportsRouter, adminRouter, ...(adminPanelEnabled ? [adminStatsRouter] : [])])
     v1.use(r);
   app.use('/v1', v1);
 

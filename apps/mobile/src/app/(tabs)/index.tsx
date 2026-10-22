@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, FlatList, Pressable, Text as RNText, useColorScheme, View } from 'react-native';
+import { AppState, FlatList, Text as RNText, useColorScheme, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -12,8 +12,12 @@ import type { FriendLocation, LocationSettings, Mood, PublicUser } from '@/api/t
 import { useSession } from '@/stores/session';
 import { ago, freshness, permissionLevel, startTracking, type PermissionLevel } from '@/features/location/tracking';
 import { cluster } from '@/features/location/cluster';
-import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } from '@/ui';
-import { palette, radius, shadow, space, useColors } from '@/theme';
+import { Appear, Avatar, Button, Card, EmptyState, ErrorState, IconButton, PressScale, PulseRing, Row, Skeleton, Text } from '@/ui';
+import { motion, palette, radius, shadow, space, useColors } from '@/theme';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+
+// Pins stay static: on Android a ViewAnnotation's children are drawn onto a bitmap, so an animation
+// inside one could be captured mid-frame (e.g. a pin frozen at scale 0). Everything around them animates.
 
 // Free, keyless vector tiles (OpenFreeMap / OpenStreetMap). Attribution stays visible as the license requires.
 const MAP_STYLE = { light: 'https://tiles.openfreemap.org/styles/liberty', dark: 'https://tiles.openfreemap.org/styles/dark' };
@@ -162,8 +166,9 @@ export default function MapScreen() {
       </Map>
 
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space.lg }}>
+        <Appear>
         <Row style={{ marginTop: space.sm }}>
-          <Pressable
+          <PressScale
             accessibilityRole="button"
             accessibilityLabel={me?.mood ? `Your mood: ${me.mood.emoji} ${me.mood.text ?? ''}. Change it` : 'Set your mood'}
             onPress={() => router.push('/mood')}
@@ -171,65 +176,60 @@ export default function MapScreen() {
           >
             <Avatar look={me?.avatarStyle} mediaId={me?.avatarMediaId} name={me?.displayName ?? me?.username} size={38} />
             <RNText style={{ fontSize: 20 }}>{me?.mood?.emoji ?? '＋'}</RNText>
-          </Pressable>
-          <Pressable
+          </PressScale>
+          <PressScale
+            scaleTo={0.98}
             accessibilityRole="button"
             accessibilityLabel={`${status}. Change who can see you`}
             onPress={() => router.push('/settings/location')}
             style={[{ flex: 1, backgroundColor: c.surface, borderRadius: radius.pill, paddingVertical: space.sm, paddingHorizontal: space.lg, flexDirection: 'row', alignItems: 'center', gap: space.sm }, shadow.card]}
           >
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s?.active ? palette.lime400 : c.border }} />
+            <View style={{ width: 10, height: 10, alignItems: 'center', justifyContent: 'center' }}>
+              {s?.active && !s.ghost && <PulseRing size={10} color={palette.lime400} />}
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: s?.active && !s.ghost ? palette.lime400 : c.border }} />
+            </View>
             <Text variant="label" color={statusColor} style={{ flex: 1 }} numberOfLines={1}>
               {status}
             </Text>
             <Ionicons name="chevron-forward" size={16} color={c.textMuted} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Friends"
-            onPress={() => router.push('/friends')}
-            style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-          >
-            <Ionicons name="people" size={22} color={c.link} />
-          </Pressable>
+          </PressScale>
+          <IconButton icon="people" label="Friends" size={44} onPress={() => router.push('/friends')} />
         </Row>
+        </Appear>
         {s?.active && perm === 'none' && (
+          <Appear delay={200}>
           <Card style={{ marginTop: space.sm }} onPress={() => router.push('/settings/location')}>
             <Text variant="bodyStrong">Location is off for Vybe</Text>
             <Text variant="caption" muted>
               Your sharing is on, but Android isn’t giving Vybe your location. Tap to fix.
             </Text>
           </Card>
+          </Appear>
         )}
       </SafeAreaView>
 
       <View style={{ position: 'absolute', right: space.lg, bottom: 170, gap: space.sm }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'}
-          onPress={toggleTheme}
-          style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-        >
-          <Ionicons name={theme === 'dark' ? 'sunny' : 'moon'} size={22} color={c.link} />
-        </Pressable>
+        <Appear delay={150}>
+          <IconButton icon={theme === 'dark' ? 'sunny' : 'moon'} label={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'} onPress={toggleTheme} />
+        </Appear>
         {perm !== 'none' && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Recenter on me"
-            onPress={async () => {
-              const me = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null));
-              if (me) camera.current?.flyTo({ center: [me.coords.longitude, me.coords.latitude], zoom: 14, duration: 600 });
-            }}
-            style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-          >
-            <Ionicons name="locate" size={22} color={c.link} />
-          </Pressable>
+          <Appear delay={220}>
+            <IconButton
+              icon="locate"
+              label="Recenter on me"
+              onPress={async () => {
+                const me = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null));
+                if (me) camera.current?.flyTo({ center: [me.coords.longitude, me.coords.latitude], zoom: 14, duration: 600 });
+              }}
+            />
+          </Appear>
         )}
       </View>
 
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: space.md }}>
         {sel ? (
-          <Card style={{ marginHorizontal: space.lg }}>
+          <Animated.View key={sel.user.id} entering={FadeInDown.springify().damping(motion.snappy.damping).stiffness(motion.snappy.stiffness)} exiting={FadeOutDown.duration(motion.fast)}>
+          <Card style={[{ marginHorizontal: space.lg, borderRadius: radius.xl }, shadow.float]}>
             <Row>
               <Avatar mediaId={sel.user.avatarMediaId} look={sel.user.avatarStyle} name={sel.user.displayName ?? sel.user.username} size={52} />
               <View style={{ flex: 1 }}>
@@ -245,6 +245,7 @@ export default function MapScreen() {
               <Button title="Profile" kind="secondary" style={{ flex: 1 }} onPress={() => router.push(`/user/${sel.user.id}`)} />
             </Row>
           </Card>
+          </Animated.View>
         ) : friends.isPending ? (
           <View style={{ paddingHorizontal: space.lg }}>
             <Skeleton height={86} />
@@ -264,8 +265,9 @@ export default function MapScreen() {
             keyExtractor={(f) => f.user.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}
-            renderItem={({ item }) => (
-              <Card style={{ width: 168, padding: space.md }} onPress={() => (item.location ? focus(item) : router.push(`/user/${item.user.id}`))}>
+            renderItem={({ item, index }) => (
+              <Appear index={index} delay={120}>
+              <Card style={{ width: 168, padding: space.md, borderRadius: radius.lg }} onPress={() => (item.location ? focus(item) : router.push(`/user/${item.user.id}`))}>
                 <Row gap={space.sm}>
                   <Avatar mediaId={item.user.avatarMediaId} look={item.user.avatarStyle} name={item.user.displayName ?? item.user.username} size={36} />
                   <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
@@ -275,6 +277,7 @@ export default function MapScreen() {
                 <FreshnessLine f={item} compact />
                 {item.user.mood && <MoodLine mood={item.user.mood} compact />}
               </Card>
+              </Appear>
             )}
           />
         )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import Animated, { FadeOutUp, SlideInUp } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/ui';
@@ -11,13 +12,16 @@ export function OfflineBanner() {
   useEffect(() => NetInfo.addEventListener((s) => setOffline(s.isConnected === false)), []);
   if (!offline) return null;
   return (
-    <View
+    <Animated.View
       accessibilityRole="alert"
-      style={{ position: 'absolute', top: insets.top + space.sm, alignSelf: 'center', zIndex: 100, backgroundColor: palette.ink, borderRadius: 999, paddingHorizontal: space.lg, paddingVertical: space.sm }}
+      entering={SlideInUp.springify().damping(18)}
+      exiting={FadeOutUp}
+      style={{ position: 'absolute', top: insets.top + space.sm, alignSelf: 'center', zIndex: 100, backgroundColor: palette.ink, borderRadius: 999, paddingHorizontal: space.lg, paddingVertical: space.sm, flexDirection: 'row', alignItems: 'center', gap: space.sm }}
     >
+      <Ionicons name="cloud-offline" size={16} color={palette.amber500} />
       <Text variant="label" color="#fff">
         You’re offline. We’ll catch up when you’re back.
       </Text>
-    </View>
+    </Animated.View>
   );
 }

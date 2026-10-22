@@ -13,8 +13,14 @@ import { insertMessage, kvGet, kvSet, markDeleted, setStatus, unsent, type ChatM
 export type Payload =
   | { v: 1; t: 'text'; id: string; ts: number; body: string; replyTo?: string }
   | { v: 1; t: 'image'; id: string; ts: number; image: { mediaId: string; key: string; w?: number; h?: number }; body?: string; replyTo?: string }
+  | { v: 1; t: 'voice'; id: string; ts: number; voice: Voice; replyTo?: string }
   | { v: 1; t: 'read'; id: string; ts: number; ids: string[] }
   | { v: 1; t: 'delete'; id: string; ts: number; target: string };
+
+/** A voice note: encrypted audio blob, its key, length, and a 0..1 loudness outline for the bubble. */
+export type Voice = { mediaId: string; key: string; ms: number; wave: number[] };
+export const VOICE_MAX_MS = 3 * 60_000;
+export const VOICE_BARS = 40;
 
 const PREKEY_BATCH = 50;
 const PREKEY_LOW_WATER = 15;
@@ -82,9 +88,8 @@ export async function sendText(peerId: string, body: string, replyTo?: string) {
   await trySend(msg);
 }
 
-/** Encrypts the image on-device (AES-256-GCM), uploads only ciphertext, and sends the key inside the Signal message. */
-export async function sendImage(peerId: string, uri: string, w?: number, h?: number) {
-  const id = Crypto.randomUUID();
+/** Encrypts a file on-device (AES-256-GCM) and uploads only the ciphertext. The key travels inside the Signal message. */
+async function uploadSealed(peerId: string, uri: string, id: string) {
   const key = await Crypto.AESEncryptionKey.generate();
   const sealed = await Crypto.aesEncryptAsync(await new File(uri).bytes(), key);
   const tmp = new File(Paths.cache, `${id}.bin`);
@@ -93,10 +98,28 @@ export async function sendImage(peerId: string, uri: string, w?: number, h?: num
   form.append('kind', 'CHAT_BLOB');
   form.append('audienceUserId', peerId);
   form.append('file', { uri: tmp.uri, name: 'blob.bin', type: 'application/octet-stream' } as unknown as Blob);
-  const { id: mediaId } = await api<{ id: string }>('/media', { form });
-  tmp.delete();
-  const image = { mediaId, key: await key.encoded('base64'), w, h };
+  try {
+    const { id: mediaId } = await api<{ id: string }>('/media', { form });
+    return { mediaId, key: await key.encoded('base64') };
+  } finally {
+    tmp.delete();
+  }
+}
+
+export async function sendImage(peerId: string, uri: string, w?: number, h?: number) {
+  const id = Crypto.randomUUID();
+  const image = { ...(await uploadSealed(peerId, uri, id)), w, h };
   const msg: ChatMessage = { id, peerId, fromMe: 1, kind: 'image', body: null, replyTo: null, image: JSON.stringify(image), status: 'sending', createdAt: Date.now(), deleted: 0 };
+  await insertMessage(msg);
+  await trySend(msg);
+}
+
+/** Sends a recorded voice note. The local recording is deleted once its ciphertext is uploaded. */
+export async function sendVoice(peerId: string, uri: string, ms: number, wave: number[]) {
+  const id = Crypto.randomUUID();
+  const voice: Voice = { ...(await uploadSealed(peerId, uri, id)), ms: Math.round(ms), wave: wave.slice(0, VOICE_BARS).map((x) => Math.round(x * 100) / 100) };
+  new File(uri).delete();
+  const msg: ChatMessage = { id, peerId, fromMe: 1, kind: 'voice', body: null, replyTo: null, image: JSON.stringify(voice), status: 'sending', createdAt: Date.now(), deleted: 0 };
   await insertMessage(msg);
   await trySend(msg);
 }
@@ -105,7 +128,9 @@ async function trySend(m: ChatMessage) {
   const payload: Payload =
     m.kind === 'image'
       ? { v: 1, t: 'image', id: m.id, ts: m.createdAt, image: JSON.parse(m.image!), replyTo: m.replyTo ?? undefined }
-      : { v: 1, t: 'text', id: m.id, ts: m.createdAt, body: m.body ?? '', replyTo: m.replyTo ?? undefined };
+      : m.kind === 'voice'
+        ? { v: 1, t: 'voice', id: m.id, ts: m.createdAt, voice: JSON.parse(m.image!), replyTo: m.replyTo ?? undefined }
+        : { v: 1, t: 'text', id: m.id, ts: m.createdAt, body: m.body ?? '', replyTo: m.replyTo ?? undefined };
   try {
     await deliver(m.peerId, payload);
     await setStatus(m.id, 'sent');
@@ -130,17 +155,20 @@ export async function deleteForEveryone(peerId: string, target: string) {
   await deliver(peerId, { v: 1, t: 'delete', id: Crypto.randomUUID(), ts: Date.now(), target }).catch(() => {});
 }
 
-/** Downloads and decrypts a chat image into the cache; returns a local file uri. */
-export async function openImage(image: { mediaId: string; key: string }) {
-  const out = new File(Paths.cache, `img-${image.mediaId}.jpg`);
+/** Downloads and decrypts a chat attachment into the cache; returns a local file uri. */
+async function openSealed(blob: { mediaId: string; key: string }, name: string) {
+  const out = new File(Paths.cache, name);
   if (out.exists) return out.uri;
-  const res = await fetch(`${API_URL}/v1/media/${image.mediaId}`, { headers: { Authorization: `Bearer ${tokens.access}` } });
+  const res = await fetch(`${API_URL}/v1/media/${blob.mediaId}`, { headers: { Authorization: `Bearer ${tokens.access}` } });
   if (!res.ok) throw new Error('download failed');
-  const key = await Crypto.AESEncryptionKey.import(image.key, 'base64');
+  const key = await Crypto.AESEncryptionKey.import(blob.key, 'base64');
   const plain = await Crypto.aesDecryptAsync(Crypto.AESSealedData.fromCombined(new Uint8Array(await res.arrayBuffer())), key);
   out.write(plain);
   return out.uri;
 }
+
+export const openImage = (image: { mediaId: string; key: string }) => openSealed(image, `img-${image.mediaId}.jpg`);
+export const openVoice = (voice: { mediaId: string; key: string }) => openSealed(voice, `voice-${voice.mediaId}.m4a`);
 
 type Wire = { id: string; senderId: string; type: number; body: string; createdAt: string };
 
@@ -164,6 +192,13 @@ async function handleIncoming(m: Wire) {
     case 'image':
       await insertMessage({ ...base, id: payload.id, kind: 'image', body: payload.body ?? null, image: JSON.stringify(payload.image) });
       break;
+    case 'voice': {
+      // Re-shape rather than store what the sender sent: bounded length and values.
+      const { mediaId, key, ms, wave } = payload.voice;
+      const voice: Voice = { mediaId: String(mediaId), key: String(key), ms: Math.min(Math.max(0, Number(ms) || 0), VOICE_MAX_MS), wave: (Array.isArray(wave) ? wave : []).slice(0, VOICE_BARS).map((x) => Math.min(1, Math.max(0, Number(x) || 0))) };
+      await insertMessage({ ...base, id: payload.id, kind: 'voice', body: null, image: JSON.stringify(voice), replyTo: payload.replyTo ?? null });
+      break;
+    }
     case 'read':
       for (const id of payload.ids.slice(0, 500)) await setStatus(id, 'read', m.senderId);
       break;

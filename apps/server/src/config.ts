@@ -17,6 +17,8 @@ const schema = z.object({
     .default('')
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
   FCM_SERVICE_ACCOUNT_PATH: z.string().optional(),
+  /** Web admin panel at /admin (sign-in with an ADMIN account). Set to "off" to remove it entirely. */
+  ADMIN_PANEL: z.enum(['on', 'off']).default('on'),
 });
 
 const parsed = schema.safeParse(process.env);

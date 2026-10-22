@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
 import { conversations, useChatVersion, type ChatMessage } from '@/features/chat/db';
 import { useFriends } from '@/features/friends/hooks';
 import { ago } from '@/features/location/tracking';
-import { Avatar, Button, EmptyState, ListItem, Pill, Row, Screen, Text } from '@/ui';
-import { space, useColors } from '@/theme';
+import { StoryTray } from '@/features/stories/StoryTray';
+import { Appear, Avatar, Button, EmptyState, IconButton, PressScale, Row, Screen, ScreenHeader, Text } from '@/ui';
+import { font, motion, radius, space, useColors } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ChatsScreen() {
@@ -19,25 +21,30 @@ export default function ChatsScreen() {
   }, [v]);
 
   const byId = new Map((friends.data?.friends ?? []).map((f) => [f.id, f]));
-  const preview = (m: ChatMessage) => (m.deleted ? 'Message deleted' : m.kind === 'image' ? '📷 Photo' : m.kind === 'system' ? m.body : `${m.fromMe ? 'You: ' : ''}${m.body ?? ''}`);
+  const preview = (m: ChatMessage) => (m.deleted ? 'Message deleted' : m.kind === 'image' ? '📷 Photo' : m.kind === 'voice' ? `${m.fromMe ? 'You: ' : ''}🎙️ Voice message` : m.kind === 'system' ? m.body : `${m.fromMe ? 'You: ' : ''}${m.body ?? ''}`);
 
   return (
     <Screen edges={['top']}>
-      <Row style={{ justifyContent: 'space-between', marginTop: space.md }}>
-        <Text variant="title" accessibilityRole="header">
-          Chats
-        </Text>
-        <Row gap={space.xs}>
-          <Ionicons name="lock-closed" size={14} color={c.liveText} />
-          <Text variant="caption" color={c.liveText}>
-            End-to-end encrypted
-          </Text>
-        </Row>
-      </Row>
-      <FlatList
+      <ScreenHeader
+        title="Chats"
+        subtitle={
+          <Row gap={space.xs} style={{ marginTop: 2 }}>
+            <Ionicons name="lock-closed" size={13} color={c.liveText} />
+            <Text variant="caption" color={c.liveText}>
+              End-to-end encrypted
+            </Text>
+          </Row>
+        }
+        right={<IconButton icon="create-outline" label="New chat" size={44} onPress={() => router.push('/friends')} />}
+      />
+      <Animated.FlatList
         data={rows}
         keyExtractor={(m) => m.peerId}
-        style={{ marginTop: space.md }}
+        itemLayoutAnimation={LinearTransition.springify().damping(motion.snappy.damping)}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: space.xl }}
+        ListHeaderComponent={<StoryTray />}
+        ListHeaderComponentStyle={{ marginBottom: space.sm }}
         ListEmptyComponent={
           <EmptyState
             emoji="💬"
@@ -46,24 +53,47 @@ export default function ChatsScreen() {
             action={<Button title="Pick a friend" onPress={() => router.push('/friends')} />}
           />
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const f = byId.get(item.peerId);
           const name = f?.displayName ?? f?.username ?? 'Former friend';
+          const unread = item.unread > 0;
           return (
-            <ListItem
-              title={name}
-              subtitle={preview(item)}
-              left={<Avatar mediaId={f?.avatarMediaId} look={f?.avatarStyle} name={name} />}
-              onPress={() => router.push(`/chat/${item.peerId}`)}
-              right={
-                <View style={{ alignItems: 'flex-end', gap: space.xs }}>
-                  <Text variant="caption" muted>
-                    {ago(new Date(item.createdAt).toISOString())}
-                  </Text>
-                  {item.unread > 0 && <Pill label={String(item.unread)} color={c.brand} textColor={c.brandText} />}
+            <Appear index={index}>
+              <PressScale
+                accessibilityRole="button"
+                accessibilityLabel={`${name}. ${preview(item)}${unread ? `. ${item.unread} unread` : ''}`}
+                scaleTo={0.98}
+                onPress={() => router.push(`/chat/${item.peerId}`)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm + 2, paddingHorizontal: space.sm, marginHorizontal: -space.sm, borderRadius: radius.md, backgroundColor: unread ? c.surface : 'transparent' }}
+              >
+                <View>
+                  <Avatar mediaId={f?.avatarMediaId} look={f?.avatarStyle} name={name} size={54} />
+                  {f?.online && <View style={{ position: 'absolute', right: 0, bottom: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: c.live, borderWidth: 3, borderColor: unread ? c.surface : c.bg }} />}
                 </View>
-              }
-            />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                      {name}
+                    </Text>
+                    <Text variant="caption" color={unread ? c.link : c.textMuted} style={unread && { fontFamily: font.bodySemi }}>
+                      {ago(new Date(item.createdAt).toISOString())}
+                    </Text>
+                  </Row>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text variant="label" color={unread ? c.text : c.textMuted} numberOfLines={1} style={{ flex: 1, fontFamily: unread ? font.bodySemi : font.body }}>
+                      {preview(item)}
+                    </Text>
+                    {unread && (
+                      <Animated.View entering={ZoomIn.springify().damping(motion.bouncy.damping)} style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text variant="caption" color={c.brandText} style={{ fontFamily: font.bodySemi }}>
+                          {item.unread > 99 ? '99+' : item.unread}
+                        </Text>
+                      </Animated.View>
+                    )}
+                  </Row>
+                </View>
+              </PressScale>
+            </Appear>
           );
         }}
       />

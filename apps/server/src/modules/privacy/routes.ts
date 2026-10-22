@@ -32,6 +32,8 @@ privacyRouter.get('/me/export', async (req, res) => {
       currentLocation: true,
       photoPosts: { select: { id: true, caption: true, createdAt: true, mediaId: true, recipients: { select: { recipientId: true, viewedAt: true } } } },
       photoReceipts: { select: { postId: true, createdAt: true, viewedAt: true } },
+      stories: { select: { id: true, caption: true, createdAt: true, expiresAt: true, mediaId: true, views: { select: { viewerId: true, viewedAt: true } } } },
+      storyViews: { select: { storyId: true, viewedAt: true } },
       chatMutes: { select: { peerId: true, until: true } },
       notificationPrefs: true,
       reportsFiled: { select: { id: true, targetUserId: true, reason: true, createdAt: true, status: true } },

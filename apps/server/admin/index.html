@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Vybe Admin</title>
+    <link rel="stylesheet" href="/admin/panel.css" />
+  </head>
+  <body>
+    <main id="login" class="login" hidden>
+      <form id="login-form" class="login-card" autocomplete="on">
+        <div class="brand">
+          <svg viewBox="150 180 724 680" width="36" height="36" aria-hidden="true">
+            <path d="M318 318 L512 742 L706 318" fill="none" stroke="currentColor" stroke-width="124" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="318" cy="318" r="96" fill="#FF6B4A" stroke="currentColor" stroke-width="28" />
+            <circle cx="706" cy="318" r="96" fill="#C6F432" stroke="currentColor" stroke-width="28" />
+          </svg>
+          <div>
+            <h1>Vybe Admin</h1>
+            <p class="muted">Sign in with an admin account.</p>
+          </div>
+        </div>
+        <label>Email<input id="email" type="email" autocomplete="username" required /></label>
+        <label>Password<input id="password" type="password" autocomplete="current-password" required maxlength="128" /></label>
+        <p id="login-error" class="error" role="alert" hidden></p>
+        <button type="submit" id="login-btn" class="primary">Sign in</button>
+        <p class="fine">Sessions end after 15 minutes without activity. Every sign-in is recorded in the audit log.</p>
+      </form>
+    </main>
+
+    <div id="app" hidden>
+      <header class="top">
+        <div class="brand small">
+          <svg viewBox="150 180 724 680" width="26" height="26" aria-hidden="true">
+            <path d="M318 318 L512 742 L706 318" fill="none" stroke="currentColor" stroke-width="124" stroke-linecap="round" stroke-linejoin="round" />
+            <circle cx="318" cy="318" r="96" fill="#FF6B4A" stroke="currentColor" stroke-width="28" />
+            <circle cx="706" cy="318" r="96" fill="#C6F432" stroke="currentColor" stroke-width="28" />
+          </svg>
+          <strong>Vybe Admin</strong>
+        </div>
+        <nav class="tabs" role="tablist">
+          <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+          <button role="tab" data-tab="reports" aria-selected="false">Reports <span id="reports-badge" class="badge" hidden></span></button>
+          <button role="tab" data-tab="errors" aria-selected="false">Crashes</button>
+        </nav>
+        <div class="top-right">
+          <span id="updated" class="muted"></span>
+          <label class="toggle"><input id="auto" type="checkbox" checked /> Auto-refresh</label>
+          <button id="refresh" class="ghost">Refresh</button>
+          <button id="logout" class="ghost">Sign out</button>
+        </div>
+      </header>
+
+      <section id="tab-overview" class="page">
+        <div id="health" class="health"></div>
+        <h2>Users</h2>
+        <div id="kpi-users" class="grid kpis"></div>
+        <div class="grid two">
+          <div class="card"><h3>Sign-ups, last 14 days</h3><div id="signups" class="chart"></div></div>
+          <div class="card"><h3>Activity</h3><div id="kpi-activity" class="list"></div></div>
+        </div>
+        <h2>Server</h2>
+        <div class="grid two">
+          <div class="card"><h3>Process</h3><div id="server" class="list"></div></div>
+          <div class="card"><h3>Storage</h3><div id="storage" class="list"></div></div>
+        </div>
+        <div class="grid two">
+          <div class="card"><h3>Database</h3><div id="db" class="list"></div></div>
+          <div class="card"><h3>App release</h3><div id="release" class="list"></div></div>
+        </div>
+        <h2>Security, last 24 hours</h2>
+        <div class="card"><div id="audit" class="list"></div></div>
+      </section>
+
+      <section id="tab-reports" class="page" hidden>
+        <h2>Open reports</h2>
+        <div id="reports"></div>
+      </section>
+
+      <section id="tab-errors" class="page" hidden>
+        <h2>Recent app crashes</h2>
+        <p class="muted">The last crash reports from the app’s error screen, kept in memory and cleared when the server restarts. Full stacks are in the server logs.</p>
+        <div id="errors"></div>
+      </section>
+    </div>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="/admin/panel.js"></script>
+  </body>
+</html>

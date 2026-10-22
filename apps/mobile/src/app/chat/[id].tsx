@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, KeyboardAvoidingView, Pressable, TextInput, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, ZoomIn, ZoomOut } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -8,12 +9,13 @@ import Signal from '@modules/vybe-signal';
 import { api } from '@/api/client';
 import type { PublicUser, Relationship } from '@/api/types';
 import { chatDb, deleteConversation, messagesWith, useChatVersion, type ChatMessage } from '@/features/chat/db';
-import { deleteForEveryone, openImage, retryUnsent, sendImage, sendReadReceipts, sendText } from '@/features/chat/service';
+import { deleteForEveryone, openImage, retryUnsent, sendImage, sendReadReceipts, sendText, type Voice } from '@/features/chat/service';
+import { MicButton, RecordingBar, useVoiceRecorder, VoiceBubble } from '@/features/chat/Voice';
 import { pickFromLibrary } from '@/lib/images';
 import { sendEvent, subscribe } from '@/lib/realtime';
 import { useSession } from '@/stores/session';
-import { Avatar, Row, Screen, Text } from '@/ui';
-import { font, radius, space, useColors } from '@/theme';
+import { Avatar, PressScale, Row, Screen, Text, TypingDots } from '@/ui';
+import { font, motion, radius, shadow, space, useColors } from '@/theme';
 
 export default function ChatScreen() {
   const { id: peerId } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +27,7 @@ export default function ChatScreen() {
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [typing, setTyping] = useState(false);
   const [identityChanged, setIdentityChanged] = useState(false);
+  const rec = useVoiceRecorder(peerId);
   const lastTypingSent = useRef(0);
   const peer = useQuery({ queryKey: ['user', peerId], queryFn: () => api<PublicUser & { relationship: Relationship }>(`/users/${peerId}`) });
   const name = peer.data?.displayName ?? peer.data?.username ?? '…';
@@ -102,6 +105,10 @@ export default function ChatScreen() {
     ]);
 
   const byId = new Map(messages.map((m) => [m.id, m]));
+  const reversed = [...messages].reverse();
+  const hasText = !!text.trim();
+  // The seen/delivered label sits under my newest message only, like most messengers.
+  const lastMine = reversed.find((m) => m.fromMe && m.kind !== 'system' && !m.deleted)?.id;
 
   return (
     <Screen padded={false} edges={['bottom']}>
@@ -113,9 +120,18 @@ export default function ChatScreen() {
               <Avatar mediaId={peer.data?.avatarMediaId} look={peer.data?.avatarStyle} name={name} size={32} />
               <View>
                 <Text variant="bodyStrong">{name}</Text>
-                <Text variant="caption" color={typing ? c.liveText : c.textMuted}>
-                  {typing ? 'typing…' : '🔒 End-to-end encrypted'}
-                </Text>
+                {typing ? (
+                  <Animated.View key="typing" entering={FadeInDown.duration(motion.fast)} style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                    <TypingDots color={c.liveText} size={5} />
+                    <Text variant="caption" color={c.liveText}>
+                      typing
+                    </Text>
+                  </Animated.View>
+                ) : (
+                  <Text variant="caption" color={c.textMuted}>
+                    🔒 End-to-end encrypted
+                  </Text>
+                )}
               </View>
             </Row>
           ),
@@ -126,6 +142,7 @@ export default function ChatScreen() {
           ),
           headerStyle: { backgroundColor: c.surface },
           headerTintColor: c.text,
+          headerShadowVisible: false,
         }}
       />
       {identityChanged && (
@@ -136,53 +153,78 @@ export default function ChatScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={90}>
         <FlatList
           inverted
-          data={[...messages].reverse()}
+          data={reversed}
           keyExtractor={(m) => m.id}
-          contentContainerStyle={{ padding: space.md, gap: space.xs }}
-          renderItem={({ item }) => <Bubble m={item} quoted={item.replyTo ? byId.get(item.replyTo) : undefined} onLongPress={() => actions(item, peerId, setReplyTo)} />}
+          contentContainerStyle={{ padding: space.md, gap: 3 }}
+          renderItem={({ item, index }) => {
+            // Inverted list: the message drawn just below this one is the previous item.
+            const below = reversed[index - 1];
+            const tail = !below || below.fromMe !== item.fromMe || below.kind === 'system' || below.createdAt - item.createdAt > 3 * 60_000;
+            return <Bubble m={item} tail={tail} receipt={item.id === lastMine} quoted={item.replyTo ? byId.get(item.replyTo) : undefined} onLongPress={() => actions(item, peerId, setReplyTo)} />;
+          }}
         />
         {canChat ? (
-          <View style={{ borderTopWidth: 1, borderColor: c.border, backgroundColor: c.surface, padding: space.sm }}>
+          <View style={{ backgroundColor: c.bg, paddingHorizontal: space.sm, paddingTop: space.xs, paddingBottom: space.sm }}>
             {replyTo && (
-              <Row style={{ paddingHorizontal: space.sm, paddingBottom: space.xs }}>
-                <Text variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
-                  Replying to: {replyTo.body ?? 'Photo'}
-                </Text>
-                <Pressable accessibilityLabel="Cancel reply" onPress={() => setReplyTo(null)}>
-                  <Ionicons name="close" size={18} color={c.textMuted} />
-                </Pressable>
-              </Row>
+              <Animated.View entering={FadeInDown.springify().damping(motion.snappy.damping)} exiting={FadeOutDown.duration(motion.fast)}>
+                <Row style={{ marginHorizontal: space.xs, marginBottom: space.xs, padding: space.sm, borderRadius: radius.md, backgroundColor: c.surface, borderLeftWidth: 3, borderLeftColor: c.brand }}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="caption" color={c.link} style={{ fontFamily: font.bodySemi }}>
+                      Replying to {replyTo.fromMe ? 'yourself' : name}
+                    </Text>
+                    <Text variant="caption" muted numberOfLines={1}>
+                      {replyTo.kind === 'voice' ? '🎙️ Voice message' : (replyTo.body ?? '📷 Photo')}
+                    </Text>
+                  </View>
+                  <Pressable accessibilityLabel="Cancel reply" hitSlop={10} onPress={() => setReplyTo(null)}>
+                    <Ionicons name="close-circle" size={20} color={c.textMuted} />
+                  </Pressable>
+                </Row>
+              </Animated.View>
             )}
-            <Row gap={space.sm}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Send a photo"
-                onPress={async () => {
-                  const img = await pickFromLibrary();
-                  if (img) await sendImage(peerId, img.uri, img.width, img.height).catch(() => Alert.alert('Photo not sent', 'Check your connection and try again.'));
-                }}
-              >
-                <Ionicons name="image" size={26} color={c.link} />
-              </Pressable>
-              <TextInput
-                value={text}
-                onChangeText={onType}
-                placeholder="Message"
-                placeholderTextColor={c.textMuted}
-                multiline
-                maxLength={4000}
-                accessibilityLabel="Message"
-                style={{ flex: 1, maxHeight: 120, minHeight: 44, backgroundColor: c.bg, color: c.text, borderRadius: radius.lg, paddingHorizontal: space.lg, paddingVertical: space.sm, fontFamily: font.body, fontSize: 16 }}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-                disabled={!text.trim()}
-                onPress={send}
-                style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: text.trim() ? c.brand : c.border, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Ionicons name="arrow-up" size={22} color="#fff" />
-              </Pressable>
+            <Row gap={space.sm} style={{ alignItems: 'flex-end' }}>
+              <View style={[{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: c.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border, paddingLeft: space.xs, minHeight: 46 }, shadow.card]}>
+                <PressScale
+                  accessibilityRole="button"
+                  accessibilityLabel="Send a photo"
+                  scaleTo={0.85}
+                  style={{ width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={async () => {
+                    const img = await pickFromLibrary();
+                    if (img) await sendImage(peerId, img.uri, img.width, img.height).catch(() => Alert.alert('Photo not sent', 'Check your connection and try again.'));
+                  }}
+                >
+                  <Ionicons name="image-outline" size={24} color={c.link} />
+                </PressScale>
+                <TextInput
+                  value={text}
+                  onChangeText={onType}
+                  placeholder={rec.recording ? '' : 'Message'}
+                  placeholderTextColor={c.textMuted}
+                  multiline
+                  maxLength={4000}
+                  accessibilityLabel="Message"
+                  style={{ flex: 1, maxHeight: 120, minHeight: 44, color: c.text, paddingHorizontal: space.sm, paddingVertical: space.sm + 2, fontFamily: font.body, fontSize: 16 }}
+                />
+                <RecordingBar rec={rec} />
+              </View>
+              {hasText && !rec.recording ? (
+                <Animated.View key="send" entering={ZoomIn.springify().damping(motion.bouncy.damping)} exiting={ZoomOut.duration(motion.fast)}>
+                  <PressScale
+                    accessibilityRole="button"
+                    accessibilityLabel="Send"
+                    scaleTo={0.85}
+                    onPress={send}
+                    style={[{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }, shadow.glow]}
+                  >
+                    <Ionicons name="arrow-up" size={22} color="#fff" />
+                  </PressScale>
+                </Animated.View>
+              ) : (
+                <Animated.View key="mic" entering={ZoomIn.springify().damping(motion.bouncy.damping)} exiting={ZoomOut.duration(motion.fast)}>
+                  <MicButton rec={rec} />
+                </Animated.View>
+              )}
             </Row>
           </View>
         ) : (
@@ -207,8 +249,16 @@ function actions(m: ChatMessage, peerId: string, setReplyTo: (m: ChatMessage) =>
   ]);
 }
 
-function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessage; onLongPress: () => void }) {
+function Bubble({ m, quoted, tail, receipt, onLongPress }: { m: ChatMessage; quoted?: ChatMessage; tail: boolean; receipt?: boolean; onLongPress: () => void }) {
   const c = useColors();
+  const reduced = useReducedMotion();
+  // Pop in only messages that just arrived or were just sent, not history scrolled into view.
+  const [fresh] = useState(() => Date.now() - m.createdAt < 5000 && !reduced);
+  const pop = useSharedValue(fresh ? 0 : 1);
+  useEffect(() => {
+    if (fresh) pop.set(withSpring(1, motion.snappy));
+  }, [fresh, pop]);
+  const popStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, pop.value * 2), transform: [{ scale: 0.85 + 0.15 * pop.value }] }));
   const [img, setImg] = useState<string | null>(null);
   useEffect(() => {
     if (m.kind === 'image' && m.image && !m.deleted) void openImage(JSON.parse(m.image)).then(setImg).catch(() => setImg(null));
@@ -223,11 +273,14 @@ function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessa
   }
   const mine = !!m.fromMe;
   const fg = mine ? c.brandText : c.text;
-  const tick = { sending: '🕓', failed: '⚠️ Not sent · hold to retry', sent: '✓', delivered: '✓✓', read: 'Read', received: '' }[m.status];
+  const tick = ({ sending: 'time-outline', failed: 'alert-circle', sent: 'checkmark', delivered: 'checkmark-done', read: 'checkmark-done', received: null } as const)[m.status];
+  const tickColor = m.status === 'read' ? c.link : m.status === 'failed' ? c.danger : c.textMuted;
+  const corner = tail ? 6 : radius.lg;
   const time = new Date(m.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   return (
-    <Pressable onLongPress={onLongPress} accessibilityHint="Long press for options" style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-      <View style={{ backgroundColor: mine ? c.brand : c.surface, borderRadius: radius.lg, borderBottomRightRadius: mine ? 6 : radius.lg, borderBottomLeftRadius: mine ? radius.lg : 6, padding: space.md, gap: space.xs }}>
+    <Animated.View style={[{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '80%', marginBottom: tail ? space.sm : 0, transformOrigin: mine ? 'right bottom' : 'left bottom' }, popStyle]}>
+    <Pressable onLongPress={onLongPress} delayLongPress={300} accessibilityHint="Long press for options">
+      <View style={[{ backgroundColor: mine ? c.brand : c.surface, borderRadius: radius.lg, borderBottomRightRadius: mine ? corner : radius.lg, borderBottomLeftRadius: mine ? radius.lg : corner, paddingHorizontal: space.md, paddingVertical: space.sm + 2, gap: space.xs }, !mine && { borderWidth: 1, borderColor: c.border }]}>
         {quoted && (
           <View style={{ borderLeftWidth: 3, borderColor: mine ? '#fff' : c.brand, paddingLeft: space.sm, opacity: 0.8 }}>
             <Text variant="caption" color={fg} numberOfLines={2}>
@@ -239,6 +292,8 @@ function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessa
           <Text color={fg} style={{ fontStyle: 'italic', opacity: 0.8 }}>
             Message deleted
           </Text>
+        ) : m.kind === 'voice' && m.image ? (
+          <VoiceBubble voice={JSON.parse(m.image) as Voice} mine={mine} />
         ) : m.kind === 'image' ? (
           img ? <Image source={{ uri: img }} style={{ width: 220, height: 260, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo" /> : <Text color={fg}>📷 Loading photo…</Text>
         ) : (
@@ -247,10 +302,31 @@ function Bubble({ m, quoted, onLongPress }: { m: ChatMessage; quoted?: ChatMessa
           </Text>
         )}
       </View>
-      <Text variant="caption" muted style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: 2 }}>
-        {time}
-        {mine && tick ? ` · ${tick}` : ''}
-      </Text>
+      {tail && (
+        <Row gap={3} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', marginTop: 3, marginHorizontal: space.xs }}>
+          <Text variant="caption" muted style={{ fontSize: 11 }}>
+            {m.status === 'failed' ? 'Not sent · hold to retry' : time}
+          </Text>
+          {mine && tick && <Ionicons name={tick} size={14} color={tickColor} accessibilityLabel={m.status} />}
+        </Row>
+      )}
+      {receipt && <Receipt status={m.status} />}
     </Pressable>
+    </Animated.View>
+  );
+}
+
+/** "Seen" under my newest message. It appears once the friend’s encrypted read receipt arrives. */
+function Receipt({ status }: { status: ChatMessage['status'] }) {
+  const c = useColors();
+  const label = { sending: 'Sending…', sent: 'Sent', delivered: 'Delivered', read: 'Seen', failed: null, received: null }[status];
+  if (!label) return null;
+  return (
+    <Animated.View key={status} entering={FadeInDown.springify().damping(motion.snappy.damping)} style={{ alignSelf: 'flex-end', marginTop: 2, marginHorizontal: space.xs, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+      {status === 'read' && <Ionicons name="eye" size={12} color={c.link} />}
+      <Text variant="caption" color={status === 'read' ? c.link : c.textMuted} style={{ fontSize: 11, fontFamily: status === 'read' ? font.bodySemi : font.body }} accessibilityLiveRegion="polite">
+        {label}
+      </Text>
+    </Animated.View>
   );
 }

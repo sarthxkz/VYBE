@@ -11,10 +11,10 @@ export type ChatMessage = {
   id: string; // client message id (same on both devices)
   peerId: string;
   fromMe: number;
-  kind: 'text' | 'image' | 'system';
+  kind: 'text' | 'image' | 'voice' | 'system';
   body: string | null;
   replyTo: string | null;
-  image: string | null; // JSON: { mediaId, key, w, h }
+  image: string | null; // JSON attachment. image: { mediaId, key, w, h }; voice: { mediaId, key, ms, wave }
   status: MessageStatus;
   createdAt: number;
   deleted: number;

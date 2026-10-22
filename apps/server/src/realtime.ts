@@ -18,6 +18,7 @@ export type ServerEvent =
   | { type: 'friend:removed'; data: { userId: string } }
   | { type: 'friend:mood'; data: { userId: string } }
   | { type: 'photo:new'; data: { postId: string; senderId: string } }
+  | { type: 'story:new'; data: { userId: string } }
   | { type: 'keys:changed'; data: { userId: string } }
   | { type: 'error'; data: { code: string } };
 
@@ -25,6 +26,9 @@ type Sock = WebSocket & { userId: string; sid: string; alive: boolean; lastTypin
 const byUser = new Map<string, Set<Sock>>();
 
 export const isOnline = (userId: string) => (byUser.get(userId)?.size ?? 0) > 0;
+
+/** Live connection counts (admin panel). */
+export const realtimeStats = () => ({ usersOnline: byUser.size, sockets: [...byUser.values()].reduce((n, s) => n + s.size, 0) });
 
 export function emit(userId: string, event: ServerEvent) {
   const set = byUser.get(userId);

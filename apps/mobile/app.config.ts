@@ -9,8 +9,8 @@ if (isRelease && (!apiUrl || !apiUrl.startsWith('https://'))) {
 
 // Bump VERSION (and android.versionCode) whenever native code changes: over-the-air updates only reach
 // APKs with the same runtime version, so a JS update can never land on incompatible native code.
-const VERSION = '0.1.1';
-const VERSION_CODE = 2;
+const VERSION = '0.1.2';
+const VERSION_CODE = 3;
 
 const config: ExpoConfig = {
   name: 'Vybe',
@@ -30,8 +30,9 @@ const config: ExpoConfig = {
       monochromeImage: './assets/android-icon-monochrome.png',
     },
     allowBackup: false,
-    permissions: ['android.permission.POST_NOTIFICATIONS'],
-    blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'],
+    // RECORD_AUDIO: voice messages only. Asked the first time someone holds the mic button in a chat.
+    permissions: ['android.permission.POST_NOTIFICATIONS', 'android.permission.RECORD_AUDIO'],
+    blockedPermissions: ['android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'],
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON,
     predictiveBackGestureEnabled: true,
   },
@@ -57,6 +58,10 @@ const config: ExpoConfig = {
     ['expo-camera', { cameraPermission: 'Vybe uses the camera so you can snap photos for friends.', recordAudioAndroid: false }],
     ['expo-image-picker', { photosPermission: 'Pick a photo to send privately to friends.', microphonePermission: false }],
     ['expo-notifications', { color: '#6C4CF5' }],
+    [
+      'expo-audio',
+      { microphonePermission: 'Vybe uses the microphone only while you hold the button to record a voice message.', recordAudioAndroid: true, enableBackgroundPlayback: false },
+    ],
     '@maplibre/maplibre-react-native',
     './plugins/withCoreLibraryDesugaring',
     './plugins/withCmakeVersion',
