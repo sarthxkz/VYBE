@@ -35,7 +35,7 @@ async function fcm() {
 }
 
 /** Push a generic notification to every live session of `userId`, honoring prefs and chat mutes. */
-export async function push(userId: string, kind: Kind, data: Record<string, string> = {}, fromUserId?: string) {
+export async function push(userId: string, kind: Kind, data: Record<string, string> = {}, fromUserId?: string, copy = COPY[kind]) {
   if (config.NODE_ENV === 'test') return;
   try {
     const prefs = await db.notificationPrefs.findUnique({ where: { userId } });
@@ -52,7 +52,7 @@ export async function push(userId: string, kind: Kind, data: Record<string, stri
     });
     for (const s of sessions) {
       await m
-        .send({ token: s.pushToken!, notification: COPY[kind], data: { kind, ...data }, android: { priority: 'high', notification: { channelId: CHANNEL[kind], sound: 'default', defaultVibrateTimings: true } } })
+        .send({ token: s.pushToken!, notification: copy, data: { kind, ...data }, android: { priority: 'high', notification: { channelId: CHANNEL[kind], sound: 'default', defaultVibrateTimings: true } } })
         .catch(async (err: { code?: string }) => {
           // Token rotated or app uninstalled: forget it.
           if (err.code === 'messaging/registration-token-not-registered' || err.code === 'messaging/invalid-argument') {
@@ -63,4 +63,15 @@ export async function push(userId: string, kind: Kind, data: Record<string, stri
   } catch (err) {
     logger.error({ err }, 'push error');
   }
+}
+
+/** Friend request / accepted, naming who (names aren't secret: the recipient sees them in the app anyway). */
+export async function pushFriend(userId: string, fromUserId: string, type: 'friend_request' | 'friend_accepted') {
+  const u = await db.user.findUnique({ where: { id: fromUserId }, select: { displayName: true, username: true } }).catch(() => null);
+  const who = (u?.displayName ?? (u?.username ? `@${u.username}` : 'Someone')).slice(0, 60);
+  const copy =
+    type === 'friend_request'
+      ? { title: '👋 New friend request', body: `${who} wants to be your friend on Vybe` }
+      : { title: '🎉 New friend', body: `${who} accepted your friend request` };
+  await push(userId, 'friendRequests', { type, url: type === 'friend_request' ? '/friends' : `/user/${fromUserId}` }, fromUserId, copy);
 }

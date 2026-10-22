@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming, ZoomIn } from 'react-native-reanimated';
 import { Gradient, PressScale, Text } from '@/ui';
 import { gradient, motion, palette, radius, shadow, space, useColors } from '@/theme';
 
@@ -52,6 +52,7 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, onCamera }:
             <TabItem
               key={route.key}
               label={label}
+              badge={options.tabBarBadge}
               icons={ICONS[route.name] ?? ['ellipse-outline', 'ellipse']}
               focused={focused}
               onPress={() => {
@@ -70,7 +71,7 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, onCamera }:
   );
 }
 
-function TabItem({ label, icons, focused, onPress, onLongPress }: { label: string; icons: [IconName, IconName]; focused: boolean; onPress: () => void; onLongPress: () => void }) {
+function TabItem({ label, icons, focused, badge, onPress, onLongPress }: { label: string; icons: [IconName, IconName]; focused: boolean; badge?: number | string; onPress: () => void; onLongPress: () => void }) {
   const c = useColors();
   const reduced = useReducedMotion();
   const pop = useSharedValue(1);
@@ -83,13 +84,24 @@ function TabItem({ label, icons, focused, onPress, onLongPress }: { label: strin
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: focused }}
-      accessibilityLabel={label}
+      accessibilityLabel={badge ? `${label}, ${badge} unread` : label}
       onPress={onPress}
       onLongPress={onLongPress}
       style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 }}
     >
       <Animated.View style={iconStyle}>
         <Ionicons name={focused ? icons[1] : icons[0]} size={23} color={color} />
+        {!!badge && (
+          <Animated.View
+            key={String(badge)}
+            entering={reduced ? undefined : ZoomIn.springify().damping(12).stiffness(320)}
+            style={{ position: 'absolute', top: -5, left: 14, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: palette.coral500, borderWidth: 2, borderColor: c.surface, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Text color="#fff" style={{ fontSize: 10, lineHeight: 12, fontWeight: '700' }} maxFontSizeMultiplier={1}>
+              {badge}
+            </Text>
+          </Animated.View>
+        )}
       </Animated.View>
       <Text variant="caption" color={color} style={{ fontSize: 11, lineHeight: 14 }} maxFontSizeMultiplier={1.2}>
         {label}

@@ -58,7 +58,7 @@ messagesRouter.post('/messages', rl.message, async (req, res) => {
       throw e;
     });
   emit(body.recipientId, { type: 'message:new', data: wire(m) });
-  if (!isOnline(body.recipientId)) void push(body.recipientId, 'messages', { type: 'message' }, me);
+  if (!isOnline(body.recipientId)) void push(body.recipientId, 'messages', { type: 'message', url: `/chat/${me}` }, me);
   res.status(201).json({ id: m.id, createdAt: m.createdAt });
 });
 

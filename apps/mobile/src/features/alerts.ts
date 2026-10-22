@@ -6,7 +6,7 @@ import type { Friend, PhotoPost } from '@/api/types';
 
 // Local notifications for messages, photos and Blinks, raised on this phone (no push service involved, so nothing
 // leaves the device). Works while the app is open or in the background, and from the background location task.
-// shortcut: with the app fully closed and sharing off nothing runs; real FCM push needs a Firebase project.
+// With the app fully closed, the server's FCM push (lib/push.ts) covers messages, photos and friend requests.
 const VIBRATE = [0, 300, 120, 300];
 let channelsReady: Promise<void> | null = null;
 

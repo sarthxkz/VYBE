@@ -104,11 +104,18 @@ export async function messagesWith(peerId: string, limit = 200) {
 export async function conversations() {
   const db = await chatDb();
   return db.getAllAsync<ChatMessage & { unread: number }>(`
-    SELECT m.*, (SELECT COUNT(*) FROM messages u WHERE u.peerId = m.peerId AND u.fromMe = 0 AND u.status = 'received') AS unread
+    SELECT m.*, (SELECT COUNT(*) FROM messages u WHERE u.peerId = m.peerId AND u.fromMe = 0 AND u.status = 'received' AND u.kind != 'system') AS unread
     FROM messages m
     WHERE m.createdAt = (SELECT MAX(createdAt) FROM messages x WHERE x.peerId = m.peerId)
     GROUP BY m.peerId
     ORDER BY m.createdAt DESC`);
+}
+
+/** How many people have messages I haven't opened yet (the Chats tab badge). */
+export async function unreadPeople() {
+  const db = await chatDb();
+  const r = await db.getFirstAsync<{ n: number }>("SELECT COUNT(DISTINCT peerId) AS n FROM messages WHERE fromMe = 0 AND status = 'received' AND kind != 'system'");
+  return r?.n ?? 0;
 }
 
 export async function unsent() {

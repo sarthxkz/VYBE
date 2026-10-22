@@ -6,7 +6,7 @@ import { friendIds, isBlockedEither } from '../../lib/authz.js';
 import { badRequest, conflict, notFound, parse } from '../../lib/errors.js';
 import { rl } from '../../lib/rateLimit.js';
 import { audit } from '../../lib/audit.js';
-import { push } from '../../lib/push.js';
+import { pushFriend } from '../../lib/push.js';
 import { emit, isOnline } from '../../realtime.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { moodSelect, publicUserSelect, withMood } from '../users/routes.js';
@@ -97,11 +97,11 @@ friendsRouter.post('/friends/requests', rl.friendRequest, async (req, res) => {
   if (result.status === 'friends') throw conflict('ALREADY_FRIENDS');
   if (result.status === 'created') {
     emit(userId, { type: 'friend:request', data: { requestId: result.id, fromId: me } });
-    void push(userId, 'friendRequests', { type: 'friend_request' });
+    void pushFriend(userId, me, 'friend_request');
   }
   if (result.status === 'accepted') {
     emit(userId, { type: 'friend:accepted', data: { userId: me } });
-    void push(userId, 'friendRequests', { type: 'friend_accepted' });
+    void pushFriend(userId, me, 'friend_accepted');
   }
   res.status(result.status === 'created' ? 201 : 200).json(result);
 });
@@ -120,7 +120,7 @@ friendsRouter.post('/friends/requests/:id/accept', async (req, res) => {
     throw e;
   }
   emit(r.fromId, { type: 'friend:accepted', data: { userId: me } });
-  void push(r.fromId, 'friendRequests', { type: 'friend_accepted' });
+  void pushFriend(r.fromId, me, 'friend_accepted');
   res.json({ status: 'accepted' });
 });
 

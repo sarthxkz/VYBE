@@ -37,11 +37,16 @@ export function RealtimeBridge() {
     // Encrypted chat backup runs when the app goes to the background (at most every 30 min).
     const bg = AppState.addEventListener('change', (s) => s === 'background' && void maybeBackup());
     // Tapping a "friend nearby" alert opens their profile. Only our own in-app paths are followed.
-    const tap = Notifications.addNotificationResponseReceivedListener((r) => {
+    const open = (r: Notifications.NotificationResponse) => {
       const url = r.notification.request.content.data?.url;
-      // Only our own in-app paths: a profile, a chat, or the Blink tab.
-      if (typeof url === 'string' && /^\/(user|chat)\/[0-9a-f-]{36}$|^\/photos$/.test(url)) router.push(url as `/user/${string}`);
-    });
+      // Only our own in-app paths: a profile, a chat, the Blink tab or friend requests.
+      if (typeof url === 'string' && /^\/(user|chat)\/[0-9a-f-]{36}$|^\/(photos|friends)$/.test(url)) router.push(url as `/user/${string}`);
+    };
+    const tap = Notifications.addNotificationResponseReceivedListener(open);
+    // A tap that cold-started the app happened before this listener existed.
+    void Notifications.getLastNotificationResponseAsync()
+      .then((r) => r && (open(r), Notifications.clearLastNotificationResponseAsync()))
+      .catch(() => {});
     const offEvents = subscribe((ev) => {
       const inv = (key: string) => void queryClient.invalidateQueries({ queryKey: [key] });
       if (ev.type.startsWith('friend:')) {

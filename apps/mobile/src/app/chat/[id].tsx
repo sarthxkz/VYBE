@@ -74,12 +74,13 @@ export default function ChatScreen() {
 
   // Mark received messages read locally and tell the sender (encrypted receipt).
   useEffect(() => {
-    const unread = (history.data ?? []).filter((m) => !m.fromMe && m.status === 'received' && m.kind !== 'system').map((m) => m.id);
-    if (!unread.length) return;
+    const fresh = (history.data ?? []).filter((m) => !m.fromMe && m.status === 'received');
+    if (!fresh.length) return;
+    const unread = fresh.filter((m) => m.kind !== 'system').map((m) => m.id);
     void (async () => {
       const db = await chatDb();
       await db.runAsync(`UPDATE messages SET status = 'read' WHERE peerId = ? AND fromMe = 0 AND status = 'received'`, peerId);
-      void sendReadReceipts(peerId, unread);
+      if (unread.length) void sendReadReceipts(peerId, unread);
       useChatVersion.getState().bump();
     })();
   }, [history.data, peerId]);

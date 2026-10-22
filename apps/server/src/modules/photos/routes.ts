@@ -58,7 +58,7 @@ photosRouter.post('/photos', async (req, res) => {
   });
   for (const r of recipients) {
     emit(r, { type: 'photo:new', data: { postId: post.id, senderId: me, instant: !!body.instant } });
-    void push(r, 'photos', { type: 'photo', postId: post.id });
+    void push(r, 'photos', { type: 'photo', postId: post.id, url: '/photos' });
   }
   res.status(201).json(post);
 });

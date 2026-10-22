@@ -38,7 +38,7 @@ export const FAQ: Faq[] = [
   { id: 'friends', q: 'How do I add friends?', keys: ['add', 'friend', 'friends', 'invite', 'contacts', 'username', 'find', 'request'],
     a: 'Go to Friends → Add to search by username, or Invite friends to send a link from your contacts or any app. They appear on your map once they accept and share with you.' },
   { id: 'notifications', q: 'I’m not getting notifications', keys: ['notification', 'notifications', 'alerts', 'alert', 'ping', 'sound', 'vibrate'],
-    a: 'Allow notifications for Vybe in Android settings and check You → Notifications. Notifications arrive fastest while Vybe is open or location sharing is on.' },
+    a: 'Allow notifications for Vybe in Android settings and check You → Notifications. Make sure you’re on Vybe 0.1.5 or newer: older versions only notify while the app is open.' },
   { id: 'vibe', q: 'How do I set my vibe or avatar?', keys: ['vibe', 'mood', 'avatar', 'emoji', 'status', 'bitmoji', 'look'],
     a: 'Tap your avatar at the top of the map to set a vibe; friends see it for 24 hours. To change your avatar, go to You → Avatar.' },
   { id: 'events', q: 'How do events on the map work?', keys: ['event', 'events', 'party', 'hotspot', 'hotspots', 'pin'],
