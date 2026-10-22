@@ -1,4 +1,5 @@
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
+import { API_URL } from '@/api/client';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { ZoomIn } from 'react-native-reanimated';
@@ -67,7 +68,24 @@ export default function MeScreen() {
           {item('About & help', 'Support, legal, licenses', '/settings/about', 'information-circle', palette.gray600)}
         </Card>
       </Appear>
-      <Appear index={4}>
+      {me?.role === 'ADMIN' && (
+        <Appear index={4}>
+          <PressScale
+            accessibilityRole="link"
+            accessibilityLabel="Open the admin dashboard in your browser"
+            onPress={() => void Linking.openURL(`${API_URL}/admin/`)}
+            scaleTo={0.94}
+            style={{ marginTop: space.lg, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: c.surfaceAlt }}
+          >
+            <Ionicons name="speedometer-outline" size={16} color={c.link} />
+            <Text variant="label" color={c.link}>
+              Admin dashboard
+            </Text>
+            <Ionicons name="open-outline" size={13} color={c.textMuted} />
+          </PressScale>
+        </Appear>
+      )}
+      <Appear index={5}>
         <PressScale accessibilityRole="button" onPress={() =>
             Alert.alert('Sign out of Vybe?', 'Signing out removes your chats from this phone. If chat backup is on, you can restore them when you sign back in.', [
               { text: 'Stay signed in', style: 'cancel' },

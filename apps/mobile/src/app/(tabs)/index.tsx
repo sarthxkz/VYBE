@@ -16,6 +16,7 @@ import { ago, freshness, permissionLevel, startTracking, stopTracking, type Perm
 import * as Haptics from 'expo-haptics';
 import { queryClient } from '@/lib/query';
 import { cluster } from '@/features/location/cluster';
+import { StoryTray } from '@/features/stories/StoryTray';
 import { Appear, Avatar, Button, Card, EmptyState, ErrorState, IconButton, Row, Skeleton, Text } from '@/ui';
 import { motion, palette, radius, shadow, space, useColors } from '@/theme';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
@@ -247,6 +248,9 @@ export default function MapScreen() {
             <Ionicons name="people" size={20} color={c.link} />
           </Pressable>
         </View>
+        </Appear>
+        <Appear delay={120}>
+          <StoryTray compact />
         </Appear>
         {s?.active && perm === 'none' && (
           <Appear delay={200}>

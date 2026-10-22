@@ -120,6 +120,8 @@ export default function StoryViewer() {
         runOnJS(setPaused)(false);
       }
     });
+  // Slow push-in while the photo plays; it follows the progress bar, so it pauses when you hold.
+  const kenBurns = useAnimatedStyle(() => ({ transform: [{ scale: reduced ? 1 : 1 + 0.08 * progress.value }] }));
   const sheet = useAnimatedStyle(() => ({
     transform: [{ translateY: drag.value }, { scale: interpolate(drag.value, [0, height], [1, 0.85]) }],
     borderRadius: interpolate(drag.value, [0, 80], [0, radius.xl], 'clamp'),
@@ -158,7 +160,7 @@ export default function StoryViewer() {
       <GestureDetector gesture={pan}>
         <Animated.View style={[{ flex: 1, overflow: 'hidden', backgroundColor: '#111' }, sheet]}>
           {story && (
-            <Animated.View key={story.id} entering={reduced ? undefined : FadeIn.duration(motion.fast)} style={StyleSheet.absoluteFill}>
+            <Animated.View key={story.id} entering={reduced ? undefined : FadeIn.duration(motion.base)} style={[StyleSheet.absoluteFill, kenBurns]}>
               <Image source={mediaSource(story.mediaId)} style={StyleSheet.absoluteFill} contentFit="contain" onLoad={() => setLoadedId(story.id)} onError={() => setLoadedId(story.id)} accessibilityLabel={story.caption ?? 'Story photo'} />
             </Animated.View>
           )}
