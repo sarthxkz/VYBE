@@ -4,7 +4,8 @@ import { api, ApiError } from '@/api/client';
 import type { AuthTokens } from '@/api/types';
 import { errorText } from '@/copy';
 import { deviceName, useSession } from '@/stores/session';
-import { Button, Input, Screen, Text } from '@/ui';
+import { Appear, Button, Input, Screen, Text } from '@/ui';
+import { AuthHeader } from '@/features/brand/AuthHeader';
 import { space, useColors } from '@/theme';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 
@@ -33,17 +34,21 @@ export default function SignIn() {
 
   return (
     <Screen ambient scroll>
-      <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.xl }}>
-        Welcome back
-      </Text>
-      <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
-      <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={submit} />
+      <AuthHeader title="Welcome back" subtitle="Your friends are on the map." />
+      <Appear index={3}>
+        <Input label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
+      </Appear>
+      <Appear index={4}>
+        <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" onSubmitEditing={submit} />
+      </Appear>
       {error && (
         <Text color={c.danger} style={{ marginBottom: space.md }} accessibilityLiveRegion="polite">
           {error}
         </Text>
       )}
-      <Button title="Sign in" loading={busy} disabled={!email || !password} onPress={submit} />
+      <Appear index={5}>
+        <Button title="Sign in" loading={busy} disabled={!email || !password} onPress={submit} />
+      </Appear>
       <Link href="/forgot" style={{ color: c.link, textAlign: 'center', marginTop: space.lg, fontSize: 16 }}>
         Forgot password?
       </Link>

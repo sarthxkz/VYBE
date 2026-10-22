@@ -16,8 +16,12 @@ import { ago, freshness, permissionLevel, startTracking, stopTracking, type Perm
 import * as Haptics from 'expo-haptics';
 import { queryClient } from '@/lib/query';
 import { cluster } from '@/features/location/cluster';
-import { Avatar, Button, Card, EmptyState, ErrorState, Row, Skeleton, Text } from '@/ui';
-import { palette, radius, shadow, space, useColors } from '@/theme';
+import { Appear, Avatar, Button, Card, EmptyState, ErrorState, IconButton, Row, Skeleton, Text } from '@/ui';
+import { motion, palette, radius, shadow, space, useColors } from '@/theme';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+
+// Pins stay static: on Android a ViewAnnotation's children are drawn onto a bitmap, so an animation
+// inside one could be captured mid-frame (e.g. a pin frozen at scale 0). Everything around them animates.
 
 // Free, keyless vector tiles (OpenFreeMap / OpenStreetMap). Attribution stays visible as the license requires.
 // Vybe's own recoloured styles (scripts/make-map-style.mjs), served from our server so the look can change without
@@ -202,6 +206,7 @@ export default function MapScreen() {
       </Map>
 
       <SafeAreaView edges={['top']} style={{ position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space.lg }}>
+        <Appear>
         <View style={[{ marginTop: space.sm, backgroundColor: c.surface, borderRadius: 28, padding: 6, flexDirection: 'row', alignItems: 'center', gap: space.sm }, shadow.float]}>
           <Pressable
             accessibilityRole="button"
@@ -242,13 +247,16 @@ export default function MapScreen() {
             <Ionicons name="people" size={20} color={c.link} />
           </Pressable>
         </View>
+        </Appear>
         {s?.active && perm === 'none' && (
+          <Appear delay={200}>
           <Card style={{ marginTop: space.sm }} onPress={() => router.push('/settings/location')}>
             <Text variant="bodyStrong">Location is off for Vybe</Text>
             <Text variant="caption" muted>
               Your sharing is on, but Android isn’t giving Vybe your location. Tap to fix.
             </Text>
           </Card>
+          </Appear>
         )}
       </SafeAreaView>
 
@@ -265,26 +273,20 @@ export default function MapScreen() {
         >
           <Ionicons name="calendar" size={22} color={c.link} />
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'}
-          onPress={toggleTheme}
-          style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-        >
-          <Ionicons name={theme === 'dark' ? 'sunny' : 'moon'} size={22} color={c.link} />
-        </Pressable>
+        <Appear delay={150}>
+          <IconButton icon={theme === 'dark' ? 'sunny' : 'moon'} label={theme === 'dark' ? 'Switch to light map' : 'Switch to dark map'} onPress={toggleTheme} />
+        </Appear>
         {perm !== 'none' && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Recenter on me"
-            onPress={async () => {
-              const me = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null));
-              if (me) camera.current?.flyTo({ center: [me.coords.longitude, me.coords.latitude], zoom: 14, duration: 600 });
-            }}
-            style={[{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }, shadow.card]}
-          >
-            <Ionicons name="locate" size={22} color={c.link} />
-          </Pressable>
+          <Appear delay={220}>
+            <IconButton
+              icon="locate"
+              label="Recenter on me"
+              onPress={async () => {
+                const me = (await Location.getLastKnownPositionAsync()) ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null));
+                if (me) camera.current?.flyTo({ center: [me.coords.longitude, me.coords.latitude], zoom: 14, duration: 600 });
+              }}
+            />
+          </Appear>
         )}
       </View>
 
@@ -292,7 +294,8 @@ export default function MapScreen() {
         {selEvent ? (
           <EventCard ev={selEvent} mine={selEvent.creator.id === me?.id} onClose={() => setSelEvent(null)} />
         ) : sel ? (
-          <Card style={{ marginHorizontal: space.lg }}>
+          <Animated.View key={sel.user.id} entering={FadeInDown.springify().damping(motion.snappy.damping).stiffness(motion.snappy.stiffness)} exiting={FadeOutDown.duration(motion.fast)}>
+          <Card style={[{ marginHorizontal: space.lg, borderRadius: radius.xl }, shadow.float]}>
             <Row>
               <Avatar mediaId={sel.user.avatarMediaId} look={sel.user.avatarStyle} name={sel.user.displayName ?? sel.user.username} size={52} />
               <View style={{ flex: 1 }}>
@@ -308,6 +311,7 @@ export default function MapScreen() {
               <Button title="Profile" kind="secondary" style={{ flex: 1 }} onPress={() => router.push(`/user/${sel.user.id}`)} />
             </Row>
           </Card>
+          </Animated.View>
         ) : friends.isPending ? (
           <View style={{ paddingHorizontal: space.lg }}>
             <Skeleton height={86} />
@@ -327,8 +331,9 @@ export default function MapScreen() {
             keyExtractor={(f) => f.user.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: space.lg, gap: space.sm }}
-            renderItem={({ item }) => (
-              <Card style={{ width: 168, padding: space.md }} onPress={() => (item.location ? focus(item) : router.push(`/user/${item.user.id}`))}>
+            renderItem={({ item, index }) => (
+              <Appear index={index} delay={120}>
+              <Card style={{ width: 168, padding: space.md, borderRadius: radius.lg }} onPress={() => (item.location ? focus(item) : router.push(`/user/${item.user.id}`))}>
                 <Row gap={space.sm}>
                   <Avatar mediaId={item.user.avatarMediaId} look={item.user.avatarStyle} name={item.user.displayName ?? item.user.username} size={36} />
                   <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
@@ -338,6 +343,7 @@ export default function MapScreen() {
                 <FreshnessLine f={item} compact />
                 {item.user.mood && <MoodLine mood={item.user.mood} compact />}
               </Card>
+              </Appear>
             )}
           />
         )}

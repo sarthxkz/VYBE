@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Linking, View } from 'react-native';
 import * as Application from 'expo-application';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeOutDown, SlideInDown } from 'react-native-reanimated';
 import { Button, Text } from '@/ui';
 import { palette, radius, space } from '@/theme';
 import { API_URL } from '@/api/client';
@@ -9,6 +10,7 @@ import { API_URL } from '@/api/client';
 // Native updates (a new APK). JS-only changes arrive silently through expo-updates instead.
 // Published by scripts/publish-apk.mjs as /app/android/latest.json on the API host.
 import { newerApk, type LatestApk } from './newerApk';
+export { newerApk, type LatestApk };
 
 export function AppUpdateBanner() {
   const insets = useSafeAreaInsets();
@@ -25,8 +27,10 @@ export function AppUpdateBanner() {
 
   if (!latest) return null;
   return (
-    <View
+    <Animated.View
       accessibilityRole="alert"
+      entering={SlideInDown.springify().damping(18)}
+      exiting={FadeOutDown}
       style={{ position: 'absolute', left: space.md, right: space.md, bottom: insets.bottom + space.md, zIndex: 100, backgroundColor: palette.ink, borderRadius: radius.lg, padding: space.md, gap: space.sm }}
     >
       <Text variant="label" color="#fff">
@@ -36,6 +40,6 @@ export function AppUpdateBanner() {
         <Button title="Download update" onPress={() => void Linking.openURL(latest.url)} style={{ flex: 1 }} />
         <Button title="Later" kind="secondary" onPress={() => setLatest(null)} />
       </View>
-    </View>
+    </Animated.View>
   );
 }

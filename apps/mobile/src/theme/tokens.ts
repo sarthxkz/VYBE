@@ -50,7 +50,7 @@ export type ColorScheme = {
 };
 
 export const light: ColorScheme = {
-  bg: palette.gray100,
+  bg: '#F7F6FB',
   surface: palette.white,
   surfaceAlt: palette.grape50,
   text: palette.ink,
@@ -71,12 +71,12 @@ export const light: ColorScheme = {
 };
 
 export const dark: ColorScheme = {
-  bg: '#0F0D18',
-  surface: '#1A1726',
-  surfaceAlt: '#241F36',
+  bg: '#0B0A12',
+  surface: '#16141F',
+  surfaceAlt: '#211D30',
   text: '#F4F2FA',
   textMuted: palette.gray400,
-  border: '#2E2943',
+  border: '#2A2639',
   brand: '#7357F6',
   brandText: palette.white,
   brandSoft: '#2C2350',
@@ -92,7 +92,7 @@ export const dark: ColorScheme = {
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
-export const radius = { sm: 10, md: 16, lg: 24, pill: 999 } as const;
+export const radius = { sm: 12, md: 18, lg: 26, xl: 34, pill: 999 } as const;
 
 export const font = {
   display: 'BricolageGrotesque_700Bold',
@@ -117,4 +117,29 @@ export type TypeVariant = keyof typeof type;
 export const shadow = {
   card: { shadowColor: '#14121F', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 3 },
   float: { shadowColor: '#14121F', shadowOpacity: 0.16, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 8 },
+  glow: { shadowColor: palette.grape500, shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
+} as const;
+
+/** Two-stop gradients (drawn with react-native-svg, so no extra native module). Text on them uses the solid token's color. */
+export const gradient = {
+  brand: ['#7B5CFF', palette.grape600],
+  action: ['#FF9A6B', palette.coral500],
+  aurora: [palette.grape500, '#B05CFF'],
+  sunset: [palette.coral500, palette.amber500],
+} as const satisfies Record<string, readonly [string, string]>;
+
+/**
+ * Motion. Springs for anything the finger touches (it should feel physical), timings for fades.
+ * Everything is skipped when the phone asks for reduced motion.
+ */
+export const motion = {
+  press: { damping: 15, stiffness: 400, mass: 0.6 },
+  snappy: { damping: 20, stiffness: 260, mass: 0.8 },
+  gentle: { damping: 18, stiffness: 140, mass: 1 },
+  bouncy: { damping: 10, stiffness: 220, mass: 0.7 },
+  fast: 160,
+  base: 260,
+  slow: 420,
+  /** Delay between items in a staggered list entrance. */
+  stagger: 45,
 } as const;

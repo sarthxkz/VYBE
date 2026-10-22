@@ -11,10 +11,10 @@ export type ChatMessage = {
   id: string; // client message id (same on both devices)
   peerId: string;
   fromMe: number;
-  kind: 'text' | 'image' | 'gif' | 'sticker' | 'system';
+  kind: 'text' | 'image' | 'gif' | 'sticker' | 'voice' | 'system';
   body: string | null;
   replyTo: string | null;
-  image: string | null; // JSON: image { mediaId, key, w, h } or gif { gifId, w, h }; sticker id is in body
+  image: string | null; // JSON: image { mediaId, key, w, h }, voice { mediaId, key, ms, wave } or gif { gifId, w, h }; sticker id is in body
   status: MessageStatus;
   createdAt: number;
   deleted: number;

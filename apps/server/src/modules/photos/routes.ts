@@ -40,8 +40,8 @@ photosRouter.post('/photos', async (req, res) => {
     req.body,
   );
   const me = uid(req);
-  const media = await db.mediaObject.findUnique({ where: { id: body.mediaId }, include: { photoPost: true } });
-  if (!media || media.ownerId !== me || media.kind !== 'PHOTO' || media.photoPost) throw badRequest('INVALID_MEDIA');
+  const media = await db.mediaObject.findUnique({ where: { id: body.mediaId }, include: { photoPost: true, story: true } });
+  if (!media || media.ownerId !== me || media.kind !== 'PHOTO' || media.photoPost || media.story) throw badRequest('INVALID_MEDIA');
   // The audience is re-checked here: only current, unblocked friends can receive.
   const friends = new Set(await friendIds(me));
   const recipients = [...new Set(body.recipientIds)];

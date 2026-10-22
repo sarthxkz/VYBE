@@ -60,7 +60,7 @@ export default function RootLayout() {
         {signedIn && <RealtimeBridge />}
         <OfflineBanner />
         <AppUpdateBanner />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'slide_from_right' }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'ios_from_right', animationDuration: 320 }}>
           <Stack.Protected guard={!signedIn} redirectTo={target}>
             <Stack.Protected guard={!introSeen} redirectTo={target}>
               <Stack.Screen name="intro" options={{ animation: 'fade' }} />
@@ -75,6 +75,7 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[id]" />
             <Stack.Screen name="user/[id]" options={{ presentation: 'modal' }} />
             <Stack.Screen name="photo/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
+            <Stack.Screen name="story/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="send-photo" />
             <Stack.Screen name="restore-chats" options={{ presentation: 'modal', gestureEnabled: false }} />

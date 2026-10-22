@@ -12,7 +12,8 @@ import Signal from '@modules/vybe-signal';
 import { api, gifSource } from '@/api/client';
 import type { PublicUser, Relationship } from '@/api/types';
 import { chatDb, deleteConversation, messagesWith, useChatVersion, type ChatMessage } from '@/features/chat/db';
-import { chatTheme, deleteForEveryone, openImage, retryUnsent, sendGif, sendImage, sendReaction, sendReadReceipts, sendSticker, sendText, sendTheme } from '@/features/chat/service';
+import { chatTheme, deleteForEveryone, openImage, retryUnsent, sendGif, sendImage, sendReaction, sendReadReceipts, sendSticker, sendText, sendTheme, type Voice } from '@/features/chat/service';
+import { MicButton, RecordingBar, useVoiceRecorder, VoiceBubble } from '@/features/chat/Voice';
 import { activeLabel, THEMES, type ChatTheme } from '@/features/chat/look';
 import { useFriends } from '@/features/friends/hooks';
 import { ChatTray } from '@/features/chat/ChatTray';
@@ -39,7 +40,7 @@ const onlyEmoji = (() => {
 })();
 
 const preview = (m?: ChatMessage) =>
-  !m ? '' : m.deleted ? 'Deleted message' : m.kind === 'image' ? 'Photo' : m.kind === 'gif' ? 'GIF' : m.kind === 'sticker' ? 'Sticker' : (m.body ?? '');
+  !m ? '' : m.deleted ? 'Deleted message' : m.kind === 'image' ? 'Photo' : m.kind === 'gif' ? 'GIF' : m.kind === 'sticker' ? 'Sticker' : m.kind === 'voice' ? 'Voice message' : (m.body ?? '');
 
 export default function ChatScreen() {
   const { id: peerId } = useLocalSearchParams<{ id: string }>();
@@ -54,6 +55,7 @@ export default function ChatScreen() {
   const [sheet, setSheet] = useState<ChatMessage | null>(null);
   const [identityChanged, setIdentityChanged] = useState(false);
   const [picker, setPicker] = useState(false);
+  const rec = useVoiceRecorder(peerId);
   const [now, setNow] = useState(() => Date.now());
   const lastTypingSent = useRef(0);
   const input = useRef<ComponentRef<typeof TextInput>>(null);
@@ -260,7 +262,8 @@ export default function ChatScreen() {
                 </Pressable>
               </Row>
             )}
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, backgroundColor: look.field, borderRadius: 26, padding: 4 }}>
+            <Row gap={space.sm} style={{ alignItems: 'flex-end' }}>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, backgroundColor: look.field, borderRadius: 26, padding: 4 }}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Send a photo"
@@ -278,7 +281,7 @@ export default function ChatScreen() {
                 value={text}
                 onChangeText={onType}
                 onFocus={() => setTray(false)}
-                placeholder="Message"
+                placeholder={rec.recording ? '' : 'Message'}
                 placeholderTextColor={look.muted}
                 multiline
                 maxLength={4000}
@@ -296,7 +299,10 @@ export default function ChatScreen() {
                   <Ionicons name={tray ? 'keypad-outline' : 'happy-outline'} size={26} color={look.fieldText} />
                 </Pressable>
               )}
+              <RecordingBar rec={rec} />
             </View>
+            {!text.trim() && <MicButton rec={rec} />}
+            </Row>
           </View>
         ) : (
           <View style={{ padding: space.lg, alignItems: 'center' }}>
@@ -623,6 +629,8 @@ function Bubble({
         <Text muted>📷</Text>
       </View>
     );
+  } else if (m.kind === 'voice' && m.image) {
+    content = <VoiceBubble voice={JSON.parse(m.image) as Voice} mine={mine} />;
   } else if (m.kind === 'gif' && m.image) {
     const g = JSON.parse(m.image) as { gifId: string; w: number; h: number };
     content = <Image source={gifSource(g.gifId, 'full')} style={{ width: 220, aspectRatio: g.w / g.h || 1, borderRadius: R, backgroundColor: c.surfaceAlt }} contentFit="cover" accessibilityLabel="GIF" />;

@@ -92,6 +92,8 @@ model User {
   moderationActions ModerationAction[] @relation("ModTarget")
   chatBackup        ChatBackup?
   events            Event[]
+  stories           Story[]
+  storyViews        StoryView[]        @relation("StoryViewer")
 
   @@map("users")
 }
@@ -269,6 +271,7 @@ model MediaObject {
   audience       User?      @relation("MediaAudience", fields: [audienceUserId], references: [id], onDelete: Cascade)
   avatarOf       User?      @relation("Avatar")
   photoPost      PhotoPost?
+  story          Story?
 
   @@index([ownerId])
   @@map("media_objects")
@@ -429,4 +432,34 @@ model GifMedia {
   createdAt DateTime @default(now())
 
   @@map("gif_media")
+}
+
+/// A photo shown to all current, unblocked friends for 24 h, then deleted (jobs.ts). Views are recorded so the
+/// owner can see who watched; nobody else can.
+model Story {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  mediaId   String      @unique @db.Uuid
+  caption   String?
+  createdAt DateTime    @default(now())
+  expiresAt DateTime
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media     MediaObject @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  views     StoryView[]
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("stories")
+}
+
+model StoryView {
+  storyId  String   @db.Uuid
+  viewerId String   @db.Uuid
+  viewedAt DateTime @default(now())
+  story    Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer   User     @relation("StoryViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, viewerId])
+  @@index([viewerId])
+  @@map("story_views")
 }

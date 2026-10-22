@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as SecureStore from 'expo-secure-store';
@@ -7,8 +7,9 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { api, mediaSource } from '@/api/client';
 import type { PhotoPost } from '@/api/types';
 import { ago } from '@/features/location/tracking';
-import { Avatar, Button, EmptyState, ErrorState, Pill, Row, Screen, Skeleton, Text } from '@/ui';
-import { palette, radius, space, useColors } from '@/theme';
+import { Appear, Avatar, Button, EmptyState, ErrorState, Gradient, IconButton, Pill, PressScale, Row, Screen, ScreenHeader, Segmented, Skeleton, Text, useBreathe } from '@/ui';
+import { gradient, palette, radius, shadow, space, useColors } from '@/theme';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 
 type Page = { items: PhotoPost[]; nextCursor: string | null };
 
@@ -30,26 +31,19 @@ export default function PhotosScreen() {
 
   return (
     <Screen ambient padded={false} edges={['top']}>
-      <View style={{ paddingHorizontal: space.xl, paddingTop: space.md }}>
-        <Text variant="title" accessibilityRole="header">
-          Blink
-        </Text>
+      <View style={{ paddingHorizontal: space.xl }}>
+        <ScreenHeader title="Blink" subtitle="Moments for your friends, opened once" right={<IconButton icon="camera" label="Open camera" size={44} onPress={() => router.push({ pathname: '/camera', params: { blink: '1' } })} />} />
         <BlinkBanner onSend={() => router.push({ pathname: '/camera', params: { blink: '1' } })} />
-        <Row style={{ marginVertical: space.md }} gap={space.sm}>
-          {(['inbox', 'sent'] as const).map((t) => (
-            <Pressable
-              key={t}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === t }}
-              onPress={() => setTab(t)}
-              style={{ paddingHorizontal: space.lg, paddingVertical: space.sm, borderRadius: radius.pill, backgroundColor: tab === t ? c.brand : c.surfaceAlt }}
-            >
-              <Text variant="label" color={tab === t ? c.brandText : c.link}>
-                {t === 'inbox' ? 'For you' : 'Sent'}
-              </Text>
-            </Pressable>
-          ))}
-        </Row>
+        <Appear index={1} style={{ marginVertical: space.md }}>
+          <Segmented
+            options={[
+              { value: 'inbox', label: 'For you' },
+              { value: 'sent', label: 'Sent' },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
+        </Appear>
       </View>
       <FlatList
         data={items}
@@ -62,8 +56,10 @@ export default function PhotosScreen() {
         onEndReached={() => q.hasNextPage && !q.isFetchingNextPage && q.fetchNextPage()}
         ListEmptyComponent={
           q.isPending ? (
-            <View style={{ paddingHorizontal: space.lg }}>
-              <Skeleton height={220} />
+            <View style={{ paddingHorizontal: space.lg, flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} height={220} style={{ width: '48.5%', marginBottom: 0, borderRadius: radius.lg }} />
+              ))}
             </View>
           ) : q.isError ? (
             <ErrorState onRetry={() => q.refetch()} />
@@ -76,22 +72,25 @@ export default function PhotosScreen() {
             />
           )
         }
-        renderItem={({ item }) => (
-          <Pressable
+        renderItem={({ item, index }) => (
+          <Appear index={index} style={{ flex: 1, maxWidth: '48.8%' }}>
+          <PressScale
             accessibilityRole="button"
             accessibilityLabel={`Photo from ${item.sender.displayName ?? item.sender.username}, ${ago(item.createdAt)}`}
             onPress={() => router.push(`/photo/${item.id}`)}
-            style={{ flex: 1, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: c.surfaceAlt, aspectRatio: 3 / 4 }}
+            style={[{ borderRadius: radius.lg, overflow: 'hidden', backgroundColor: c.surfaceAlt, aspectRatio: 3 / 4 }, shadow.card]}
           >
             {item.instant && tab === 'inbox' ? (
               // Never preview a Blink: the only look is the one-time open.
-              <View style={{ flex: 1, backgroundColor: palette.grape500, alignItems: 'center', justifyContent: 'center', gap: space.xs }}>
-                <Text variant="title" color="#fff">✨</Text>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xs }}>
+                <Gradient colors={gradient.aurora} />
+                <Sparkle />
                 <Text variant="label" color="#fff">Blink · tap to open once</Text>
               </View>
             ) : (
               <Image source={mediaSource(item.mediaId)} style={{ flex: 1 }} contentFit="cover" transition={200} recyclingKey={item.id} />
             )}
+            <Gradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.55)']} angle="vertical" style={{ top: '60%' }} />
             <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm }}>
               <Row gap={space.xs}>
                 <Avatar mediaId={item.sender.avatarMediaId} look={item.sender.avatarStyle} name={item.sender.displayName ?? item.sender.username} size={24} />
@@ -108,7 +107,8 @@ export default function PhotosScreen() {
                 {tab === 'inbox' && !item.viewedAt && <Pill label="New" color={c.live} textColor="#14121F" />}
               </Row>
             </View>
-          </Pressable>
+          </PressScale>
+          </Appear>
         )}
       />
     </Screen>
@@ -151,5 +151,17 @@ function BlinkBanner({ onSend }: { onSend: () => void }) {
         </Pressable>
       </Row>
     </View>
+  );
+}
+
+function Sparkle() {
+  const t = useBreathe(900);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.15 * t.value }, { rotate: `${t.value * 12}deg` }] }));
+  return (
+    <Animated.View style={style}>
+      <Text variant="title" color="#fff">
+        ✨
+      </Text>
+    </Animated.View>
   );
 }

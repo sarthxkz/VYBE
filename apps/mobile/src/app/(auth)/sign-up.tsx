@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useRouter } from 'expo-router';
 import { api } from '@/api/client';
 import { errorText } from '@/copy';
-import { Button, Input, Screen, Text } from '@/ui';
+import { Appear, Button, Input, Screen, Text } from '@/ui';
+import { AuthHeader } from '@/features/brand/AuthHeader';
 import { space, useColors } from '@/theme';
 import { GoogleButton } from '@/features/auth/GoogleButton';
 
@@ -34,13 +35,11 @@ export default function SignUp() {
 
   return (
     <Screen ambient scroll>
-      <Text variant="title" accessibilityRole="header" style={{ marginTop: space.xxl, marginBottom: space.sm }}>
-        Join Vybe
-      </Text>
-      <Text muted style={{ marginBottom: space.xl }}>
-        Your location, photos and chats stay between you and your friends.
-      </Text>
+      <AuthHeader title="Join Vybe" subtitle="Your location, photos and chats stay between you and your friends." />
+      <Appear index={3}>
       <Input label="Email" value={email} onChangeText={(v) => { setEmail(v); setTaken(false); }} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />
+      </Appear>
+      <Appear index={4}>
       <Input
         label="Password"
         value={password}
@@ -51,6 +50,7 @@ export default function SignUp() {
         hint="At least 10 characters. A short phrase works great."
         error={password && !pwOk ? 'Use at least 10 characters.' : null}
       />
+      </Appear>
       {error && (
         <Text color={c.danger} style={{ marginBottom: space.md }} accessibilityLiveRegion="polite">
           {error}

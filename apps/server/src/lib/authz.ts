@@ -104,11 +104,18 @@ export async function canViewPhoto(postId: string, viewer: string, c: Client = d
   return !(await isBlockedEither(post.senderId, viewer, c));
 }
 
+/** A story: its owner, or a current friend (no block either way) while it hasn't expired. */
+export async function canViewStory(storyId: string, viewer: string, c: Client = db) {
+  const s = await c.story.findUnique({ where: { id: storyId }, select: { userId: true, expiresAt: true } });
+  if (!s || s.expiresAt < new Date()) return false;
+  return s.userId === viewer || (await canInteract(s.userId, viewer, c));
+}
+
 /** Download authorization for a stored media object. */
 export async function canViewMedia(mediaId: string, viewer: string, c: Client = db) {
   const m = await c.mediaObject.findUnique({
     where: { id: mediaId },
-    select: { ownerId: true, kind: true, audienceUserId: true, photoPost: { select: { id: true } } },
+    select: { ownerId: true, kind: true, audienceUserId: true, photoPost: { select: { id: true } }, story: { select: { id: true } } },
   });
   if (!m) return false;
   if (m.ownerId === viewer) return true;
@@ -118,6 +125,7 @@ export async function canViewMedia(mediaId: string, viewer: string, c: Client = 
       // Avatars are visible to any signed-in, non-blocked user (shown in search and requests).
       return true;
     case 'PHOTO':
+      if (m.story) return canViewStory(m.story.id, viewer, c);
       return !!m.photoPost && (await canViewPhoto(m.photoPost.id, viewer, c));
     case 'CHAT_BLOB':
       return m.audienceUserId === viewer && (await areFriends(m.ownerId, viewer, c));

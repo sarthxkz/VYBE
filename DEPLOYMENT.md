@@ -68,6 +68,14 @@ docker build -f Dockerfile.android --build-arg EXPO_PUBLIC_API_URL=https://api.1
 ## App updates hosting
 Caddy serves `~/vybe/deploy/public` read-only: `/ota/...` (signed OTA manifests and content-addressed bundles/assets) and `/app/android/...` (APKs and `latest.json`). `apps/mobile/scripts/publish.mjs` uploads there over SSH, and the file clients poll moves into place last. The VM never holds a signing key. There's no directory listing; missing files return 404.
 
+## Admin panel
+The API serves a web admin panel at `https://<host>/admin/`: server and database health, storage, usage numbers, recent app crashes, and the open-reports queue with resolve actions. It needs an account with the `ADMIN` role. Grant one on the VM (prints a generated password once; it's stored only as an argon2 hash):
+```bash
+cd ~/vybe/deploy && docker compose exec vybe-api node dist/cli/make-admin.js you@example.com
+# existing account: promoted, password unchanged; add --new-password to issue a fresh one
+```
+To turn the panel off, set `ADMIN_PANEL=off` in `deploy/.env` and `docker compose up -d`. The login is rate limited and audited like the app's; there's no 2FA yet, so use a long unique password.
+
 ## Operations
 - **Logs:** `docker compose logs -f vybe-api` (structured JSON, secrets redacted).
 - **Restart policy:** `unless-stopped` on db and API; the API has a `/ready` health check.

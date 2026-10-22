@@ -54,3 +54,16 @@ export type AuthTokens = { accessToken: string; refreshToken: string; expiresIn:
 
 /** A friend's event pin on the map. */
 export type EventPin = { id: string; title: string; emoji: string; lat: number; lng: number; startsAt: string; endsAt: string; creator: PublicUser };
+/** One photo in someone's story (friends only, 24 h). `viewCount` is present only on your own stories. */
+export type Story = {
+  id: string;
+  mediaId: string;
+  caption: string | null;
+  createdAt: string;
+  expiresAt: string;
+  media: { width: number | null; height: number | null };
+  seen: boolean;
+  viewCount?: number;
+};
+export type StoryGroup = { user: PublicUser; stories: Story[]; unseen: number };
+export type StoryFeed = { mine: StoryGroup | null; friends: StoryGroup[] };

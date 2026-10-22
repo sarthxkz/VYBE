@@ -11,6 +11,8 @@ export default function FriendsLayout() {
         headerTintColor: c.text,
         headerTitleStyle: { fontFamily: font.display },
         contentStyle: { backgroundColor: c.bg },
+        animation: 'ios_from_right',
+        headerTitleAlign: 'left',
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Friends' }} />

@@ -8,18 +8,20 @@ import { errorText } from '@/copy';
 import { BlinkIntro, shouldIntroduceBlink } from '@/features/BlinkIntro';
 import { useFriends } from '@/features/friends/hooks';
 import { uploadImage } from '@/lib/images';
-import { Avatar, Button, EmptyState, Input, ListItem, Screen, Text } from '@/ui';
+import { Appear, Avatar, Button, EmptyState, Input, ListItem, Screen, Segmented, Text } from '@/ui';
 import { radius, space, useColors } from '@/theme';
 
 export default function SendPhoto() {
   const c = useColors();
   const router = useRouter();
   const qc = useQueryClient();
-  const { uri, w, h, blink } = useLocalSearchParams<{ uri: string; w: string; h: string; blink?: string }>();
+  const { uri, w, h, blink, to: toParam } = useLocalSearchParams<{ uri: string; w: string; h: string; blink?: string; to?: string }>();
   const friends = useFriends();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [caption, setCaption] = useState('');
   const [instant, setInstant] = useState(blink === '1');
+  const [to, setTo] = useState<'friends' | 'story'>(toParam === 'story' ? 'story' : 'friends');
+  const story = to === 'story';
   const [introBlink, setIntroBlink] = useState(false);
   const allIds = (friends.data?.friends ?? []).map((f) => f.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
@@ -55,6 +57,12 @@ export default function SendPhoto() {
     try {
       const id = mediaId ?? (await uploadImage({ uri, width: Number(w), height: Number(h) }, 'PHOTO', setProgress)).id;
       setMediaId(id);
+      if (story) {
+        await api('/stories', { body: { mediaId: id, caption: caption.trim() || undefined } });
+        void qc.invalidateQueries({ queryKey: ['stories'] });
+        router.replace('/chats');
+        return;
+      }
       await api('/photos', { body: { mediaId: id, caption: instant ? undefined : caption.trim() || undefined, recipientIds: [...selected], instant } });
       void qc.invalidateQueries({ queryKey: ['photos'] });
       router.replace({ pathname: '/photos', params: { tab: 'sent' } }); // show what you just sent
@@ -66,6 +74,19 @@ export default function SendPhoto() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      <Appear style={{ marginTop: space.md }}>
+        <Segmented
+          options={[
+            { value: 'friends', label: 'Friends' },
+            { value: 'story', label: 'My story' },
+          ]}
+          value={to}
+          onChange={(v) => {
+            setTo(v);
+            if (v === 'story') setInstant(false);
+          }}
+        />
+      </Appear>
       <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.md, alignItems: 'center' }}>
         <Image source={{ uri }} style={{ width: 72, height: 96, borderRadius: radius.md }} contentFit="cover" accessibilityLabel="Photo to send" />
         <View style={{ flex: 1 }}>
@@ -76,6 +97,12 @@ export default function SendPhoto() {
           )}
         </View>
       </View>
+      {story ? (
+        <Appear style={{ flex: 1 }}>
+          <EmptyState emoji="🌅" title="Share to your story" body="All your friends can see it for 24 hours, then it’s deleted. You’ll see who watched it. Location data is removed first." />
+        </Appear>
+      ) : (
+      <>
       <ListItem
         title="✨ Send as a Blink"
         subtitle="Each friend can open it once, then it’s gone. Unopened Blinks disappear after 24 hours."
@@ -109,6 +136,8 @@ export default function SendPhoto() {
           />
         )}
       />
+      </>
+      )}
       {error && <Text color={c.danger}>{error}</Text>}
       {progress !== null && (
         <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surfaceAlt, marginVertical: space.sm }} accessibilityLabel={`Uploading ${Math.round(progress * 100)} percent`}>
@@ -116,9 +145,9 @@ export default function SendPhoto() {
         </View>
       )}
       <Button
-        title={error ? 'Retry' : selected.size ? `Send to ${selected.size}` : 'Pick at least one friend'}
+        title={error ? 'Retry' : story ? 'Share to my story' : selected.size ? `Send to ${selected.size}` : 'Pick at least one friend'}
         kind="action"
-        disabled={!selected.size}
+        disabled={!story && !selected.size}
         loading={progress !== null}
         onPress={send}
         style={{ marginVertical: space.md }}

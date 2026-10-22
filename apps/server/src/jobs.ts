@@ -28,13 +28,17 @@ export async function runCleanup() {
   });
   if (instants.length) await deleteMedia(instants.map((p) => p.mediaId));
 
+  // Stories: gone 24 h after posting (deleting the media cascades to the story and its views).
+  const stories = await db.story.findMany({ where: { expiresAt: { lt: new Date() } }, select: { mediaId: true }, take: 1000 });
+  if (stories.length) await deleteMedia(stories.map((s) => s.mediaId));
+
   // Media uploaded but never attached (abandoned uploads). Chat images are kept (they're end-to-end encrypted)
   // so a restored chat backup can still show them; only the two friends can fetch them, and they're deleted
   // with the sender's account.
   const orphans = await db.mediaObject.findMany({
     where: {
       OR: [
-        { kind: 'PHOTO', photoPost: null, createdAt: { lt: ago(24 * 3600_000) } },
+        { kind: 'PHOTO', photoPost: null, story: null, createdAt: { lt: ago(24 * 3600_000) } },
         { kind: 'AVATAR', avatarOf: null, createdAt: { lt: ago(24 * 3600_000) } },
       ],
     },

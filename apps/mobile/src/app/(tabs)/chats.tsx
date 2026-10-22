@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated, { LinearTransition, ZoomIn } from 'react-native-reanimated';
 import { conversations, useChatVersion, type ChatMessage } from '@/features/chat/db';
-import { activeLabel, shortAgo } from '@/features/chat/look';
+import { shortAgo } from '@/features/chat/look';
 import { useFriends } from '@/features/friends/hooks';
 import type { Friend } from '@/api/types';
-import { Avatar, Button, EmptyState, Row, Screen, Text } from '@/ui';
-import { font, radius, space, useColors } from '@/theme';
+import { StoryTray } from '@/features/stories/StoryTray';
+import { Appear, Avatar, Button, EmptyState, IconButton, PressScale, Row, Screen, ScreenHeader, Text } from '@/ui';
+import { font, motion, radius, space, useColors } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
-
-const ONLINE = '#22C55E';
 
 export default function ChatsScreen() {
   const c = useColors();
@@ -41,19 +41,35 @@ export default function ChatsScreen() {
 
   const you = (m: ChatMessage) => (m.fromMe ? 'You: ' : '');
   const preview = (m: ChatMessage) =>
-    m.deleted ? 'Message deleted' : m.kind === 'image' ? `${you(m)}📷 Photo` : m.kind === 'gif' ? `${you(m)}GIF` : m.kind === 'sticker' ? `${you(m)}✨ Sticker` : m.kind === 'system' ? m.body : `${you(m)}${m.body ?? ''}`;
+    m.deleted
+      ? 'Message deleted'
+      : m.kind === 'image'
+        ? `${you(m)}📷 Photo`
+        : m.kind === 'gif'
+          ? `${you(m)}GIF`
+          : m.kind === 'sticker'
+            ? `${you(m)}✨ Sticker`
+            : m.kind === 'voice'
+              ? `${you(m)}🎙️ Voice message`
+              : m.kind === 'system'
+                ? m.body
+                : `${you(m)}${m.body ?? ''}`;
 
   return (
     <Screen edges={['top']}>
-      <Row style={{ justifyContent: 'space-between', marginTop: space.md }}>
-        <Text variant="title" accessibilityRole="header">
-          Chats
-        </Text>
-        <Pressable accessibilityRole="button" accessibilityLabel="New chat" onPress={() => router.push('/friends')} hitSlop={10}>
-          <Ionicons name="create-outline" size={26} color={c.text} />
-        </Pressable>
-      </Row>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: c.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.md, marginTop: space.md }}>
+      <ScreenHeader
+        title="Chats"
+        subtitle={
+          <Row gap={space.xs} style={{ marginTop: 2 }}>
+            <Ionicons name="lock-closed" size={13} color={c.liveText} />
+            <Text variant="caption" color={c.liveText}>
+              End-to-end encrypted
+            </Text>
+          </Row>
+        }
+        right={<IconButton icon="create-outline" label="New chat" size={44} onPress={() => router.push('/friends')} />}
+      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: c.surfaceAlt, borderRadius: radius.pill, paddingHorizontal: space.md, marginBottom: space.sm }}>
         <Ionicons name="search" size={18} color={c.textMuted} />
         <TextInput
           value={q}
@@ -64,32 +80,39 @@ export default function ChatsScreen() {
           style={{ flex: 1, height: 40, color: c.text, fontFamily: font.body, fontSize: 16 }}
         />
       </View>
-      <FlatList
+      <Animated.FlatList
         data={shown}
         keyExtractor={(m) => m.peerId}
-        style={{ marginTop: space.sm }}
+        itemLayoutAnimation={LinearTransition.springify().damping(motion.snappy.damping)}
+        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: space.xl }}
         ListHeaderComponent={
-          activeNow.length > 0 && !needle ? (
+          needle ? undefined : (
             <View style={{ marginBottom: space.sm }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.lg, paddingVertical: space.sm }}>
-                {activeNow.map((f) => (
-                  <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={`${nameOf(f)}, active now. Message`} onPress={() => router.push(`/chat/${f.id}`)} style={{ alignItems: 'center', width: 68 }}>
-                    <View>
-                      <Avatar mediaId={f.avatarMediaId} look={f.avatarStyle} name={nameOf(f)} size={60} />
-                      <View style={{ position: 'absolute', right: 1, bottom: 1, width: 17, height: 17, borderRadius: 9, backgroundColor: ONLINE, borderWidth: 3, borderColor: c.bg }} />
-                    </View>
-                    <Text variant="caption" numberOfLines={1} style={{ marginTop: 4 }}>
-                      {nameOf(f).split(' ')[0]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <Text variant="label" muted>
-                Messages
-              </Text>
+              <StoryTray />
+              {activeNow.length > 0 && (
+                <>
+                  <Text variant="label" muted style={{ marginTop: space.sm }}>
+                    Active now
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.lg, paddingVertical: space.sm }}>
+                    {activeNow.map((f) => (
+                      <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={`${nameOf(f)}, active now. Message`} onPress={() => router.push(`/chat/${f.id}`)} style={{ alignItems: 'center', width: 64 }}>
+                        <View>
+                          <Avatar mediaId={f.avatarMediaId} look={f.avatarStyle} name={nameOf(f)} size={56} />
+                          <View style={{ position: 'absolute', right: 1, bottom: 1, width: 16, height: 16, borderRadius: 8, backgroundColor: c.live, borderWidth: 3, borderColor: c.bg }} />
+                        </View>
+                        <Text variant="caption" numberOfLines={1} style={{ marginTop: 4 }}>
+                          {nameOf(f).split(' ')[0]}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </>
+              )}
             </View>
-          ) : undefined
+          )
         }
         ListEmptyComponent={
           needle ? (
@@ -105,50 +128,47 @@ export default function ChatsScreen() {
             />
           )
         }
-        ListFooterComponent={
-          rows.length > 0 ? (
-            <Row gap={space.xs} style={{ justifyContent: 'center', paddingVertical: space.lg }}>
-              <Ionicons name="lock-closed" size={12} color={c.textMuted} />
-              <Text variant="caption" muted>
-                Your chats are end-to-end encrypted
-              </Text>
-            </Row>
-          ) : undefined
-        }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const f = byId.get(item.peerId);
           const name = nameOf(f);
           const unread = item.unread > 0;
-          const status = activeLabel(f?.online, f?.lastActiveAt, now);
           return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`${name}${unread ? `, ${item.unread} unread` : ''}. ${preview(item)}`}
-              onPress={() => router.push(`/chat/${item.peerId}`)}
-              style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm, backgroundColor: pressed ? c.surfaceAlt : 'transparent' })}
-            >
-              <View>
-                <Avatar mediaId={f?.avatarMediaId} look={f?.avatarStyle} name={name} size={56} />
-                {f?.online && <View style={{ position: 'absolute', right: 0, bottom: 0, width: 16, height: 16, borderRadius: 8, backgroundColor: ONLINE, borderWidth: 3, borderColor: c.bg }} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong" numberOfLines={1}>
-                  {name}
-                </Text>
-                <Text variant={unread ? 'bodyStrong' : 'caption'} color={unread ? c.text : c.textMuted} numberOfLines={1} style={unread ? { fontSize: 14 } : undefined}>
-                  {unread && item.unread > 1 ? `${item.unread} new messages` : preview(item)}
-                  <Text variant="caption" muted>
-                    {` · ${shortAgo(item.createdAt, now)}`}
-                  </Text>
-                </Text>
-                {!unread && status === 'Active now' && (
-                  <Text variant="caption" color={c.liveText}>
-                    {status}
-                  </Text>
-                )}
-              </View>
-              {unread && <View accessibilityElementsHidden style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.brand }} />}
-            </Pressable>
+            <Appear index={index}>
+              <PressScale
+                accessibilityRole="button"
+                accessibilityLabel={`${name}. ${preview(item)}${unread ? `. ${item.unread} unread` : ''}`}
+                scaleTo={0.98}
+                onPress={() => router.push(`/chat/${item.peerId}`)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm + 2, paddingHorizontal: space.sm, marginHorizontal: -space.sm, borderRadius: radius.md, backgroundColor: unread ? c.surface : 'transparent' }}
+              >
+                <View>
+                  <Avatar mediaId={f?.avatarMediaId} look={f?.avatarStyle} name={name} size={54} />
+                  {f?.online && <View style={{ position: 'absolute', right: 0, bottom: 0, width: 15, height: 15, borderRadius: 8, backgroundColor: c.live, borderWidth: 3, borderColor: unread ? c.surface : c.bg }} />}
+                </View>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text variant="bodyStrong" numberOfLines={1} style={{ flex: 1 }}>
+                      {name}
+                    </Text>
+                    <Text variant="caption" color={unread ? c.link : c.textMuted} style={unread && { fontFamily: font.bodySemi }}>
+                      {shortAgo(item.createdAt, now)}
+                    </Text>
+                  </Row>
+                  <Row style={{ justifyContent: 'space-between' }}>
+                    <Text variant="label" color={unread ? c.text : c.textMuted} numberOfLines={1} style={{ flex: 1, fontFamily: unread ? font.bodySemi : font.body }}>
+                      {preview(item)}
+                    </Text>
+                    {unread && (
+                      <Animated.View entering={ZoomIn.springify().damping(motion.bouncy.damping)} style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }}>
+                        <Text variant="caption" color={c.brandText} style={{ fontFamily: font.bodySemi }}>
+                          {item.unread > 99 ? '99+' : item.unread}
+                        </Text>
+                      </Animated.View>
+                    )}
+                  </Row>
+                </View>
+              </PressScale>
+            </Appear>
           );
         }}
       />

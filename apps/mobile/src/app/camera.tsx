@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from 'expo-camera';
 import { Image } from 'expo-image';
-import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { permission } from '@/copy';
@@ -14,6 +14,7 @@ export default function CameraScreen() {
   const router = useRouter();
   const { blink } = useLocalSearchParams<{ blink?: string }>(); // forwarded so "Send a Blink" starts in Blink mode
   const cam = useRef<CameraView>(null);
+  const { to } = useLocalSearchParams<{ to?: string }>(); // 'story' when opened from the story tray
   const [perm, requestPerm] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<FlashMode>('off');
@@ -49,7 +50,7 @@ export default function CameraScreen() {
             )
           }
         />
-        <Button title="Pick from gallery instead" kind="ghost" onPress={async () => { const img = await pickFromLibrary(); if (img) router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink } }); }} />
+        <Button title="Pick from gallery instead" kind="ghost" onPress={async () => { const img = await pickFromLibrary(); if (img) router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink, ...(to && { to }) } }); }} />
         <Button title="Close" kind="ghost" onPress={() => router.back()} />
       </Screen>
     );
@@ -59,14 +60,14 @@ export default function CameraScreen() {
     if (!cam.current || busy) return;
     setBusy(true);
     try {
-      const pic = await cam.current.takePictureAsync({ quality: 0.9, exif: false });
+      const pic = await cam.current.takePictureAsync({ quality: 0.9, exif: false, shutterSound: false });
       if (pic) setShot(await prepareImage(pic.uri));
     } finally {
       setBusy(false);
     }
   };
 
-  const send = (img: Prepared) => router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink } });
+  const send = (img: Prepared) => router.replace({ pathname: '/send-photo', params: { uri: img.uri, w: img.width, h: img.height, blink, ...(to && { to }) } });
 
   if (shot) {
     return (

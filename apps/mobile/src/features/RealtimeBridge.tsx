@@ -54,6 +54,7 @@ export function RealtimeBridge() {
         void alertPhoto(String(ev.data.senderId), !!ev.data.instant);
       }
       if (ev.type === 'event:changed') inv('events');
+      if (ev.type === 'story:new' || ev.type.startsWith('friend:')) inv('stories');
       if (ev.type === 'presence') inv('friends');
       if (ev.type === 'location:update' || ev.type === 'location:removed') inv('locations');
     });

@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "make-admin": "node dist/cli/make-admin.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

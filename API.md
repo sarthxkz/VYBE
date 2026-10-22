@@ -80,12 +80,15 @@ Health: `GET /health` (process up), `GET /ready` (DB reachable). Both are unauth
 | POST | `/messages/ack` | `{ids[]}`. Deletes the acked ciphertext and notifies the sender. |
 
 ## Reports & admin 🔒
-`POST /reports {targetUserId, photoPostId?, reason, details?}` (20/hour; you can only report photos you could see). Admin only: `GET /admin/reports?status=`, `POST /admin/reports/:id/resolve {action: NONE|REMOVE_PHOTO|SUSPEND, note?}`.
+`POST /reports {targetUserId, photoPostId?, reason, details?}` (20/hour; you can only report photos you could see). Admin only: `GET /admin/reports?status=`, `POST /admin/reports/:id/resolve {action: NONE|REMOVE_PHOTO|SUSPEND, note?}`, `GET /admin/overview` (aggregate server, database, storage and usage numbers for the web panel; no per-user data).
+
+## Admin panel (web)
+`GET /admin/` serves a static page (HTML/CSS/JS, `Cache-Control: no-store`, `noindex`, same-origin scripts only). It signs in through `/auth/login` like the app and needs an `ADMIN` account; a non-admin login is signed out immediately. Tokens are kept in memory only, and the session ends after 15 idle minutes. Grant access on the server with `node dist/cli/make-admin.js <email> [--new-password]`. Set `ADMIN_PANEL=off` to remove both the page and `/admin/overview`.
 
 ## WebSocket `/ws`
 Connect with an `Authorization: Bearer` header. Failed auth → HTTP 401. The socket closes with code `4001` when the access token expires or the session is revoked; reconnect after refreshing. Ping every 30 s.
 
-Server → client: `hello`, `location:update`, `location:removed`, `message:new`, `message:delivered`, `typing`, `presence`, `friend:request`, `friend:accepted`, `friend:removed`, `photo:new`, `keys:changed`, `error`.
+Server → client: `hello`, `location:update`, `location:removed`, `message:new`, `message:delivered`, `typing`, `presence`, `friend:request`, `friend:accepted`, `friend:removed`, `photo:new`, `story:new`, `keys:changed`, `error`.
 Client → server: `{type:'typing', data:{to, on}}` (friends only, max 1/s), `{type:'ping'}`. There are no client-chosen subscriptions: the server only pushes events the user is authorized to receive.
 
 ## Chat backup 🔒
@@ -99,8 +102,19 @@ Client → server: `{type:'typing', data:{to, on}}` (friends only, max 1/s), `{t
 ## Instants ("Blinks" in the app)
 `POST /photos` accepts `instant: true`: the post gets `expiresAt` = now + 24 h. A recipient can load it until 2 minutes after `POST /photos/:id/viewed`; then `/photos/:id` and `/media/:id` return 404 and it leaves the inbox. The cleanup job deletes the file once everyone opened it, or at expiry.
 
+## Stories 🔒
+A photo shared with all current, unblocked friends for 24 h. Upload it first with `POST /media kind=PHOTO` (EXIF stripped); a media object can back either a photo post or a story, not both.
+
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/stories` | `{mediaId, caption? ≤200}` → the story. Max 30 live stories per person. Emits `story:new` to friends. |
+| GET | `/stories/feed` | `{mine: Group \| null, friends: Group[]}`, `Group = {user, stories[], unseen}`; friends with unseen stories first. `viewCount` only on your own stories. |
+| POST | `/stories/:id/view` | Record that I watched it (friends only; 404 otherwise). Idempotent. |
+| GET | `/stories/:id/viewers` | Owner only: `{viewers: [{viewedAt, viewer}]}`, people blocked since are left out. |
+| DELETE | `/stories/:id` | Owner only; deletes the file for everyone. |
+
 ## Client errors
-`POST /client-errors` (no auth, 10/min/IP): `{message ≤500, stack? ≤4000, path?, version?, updateId?}` from the app's error screen. Logged at warn level.
+`POST /client-errors` (no auth, 10/min/IP): `{message ≤500, stack? ≤4000, path?, version?, updateId?}` from the app's error screen. Logged at warn level; the last 50 (without stacks) are also kept in memory for the admin panel.
 
 ## GIFs 🔒 (KLIPY or GIPHY proxy, needs `KLIPY_API_KEY` or `GIPHY_API_KEY`)
 | Method | Path | Notes |

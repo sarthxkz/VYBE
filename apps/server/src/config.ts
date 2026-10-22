@@ -20,6 +20,8 @@ const schema = z.object({
   // Optional: enables GIF search in chat (proxied; see modules/gifs). KLIPY wins if both are set.
   GIPHY_API_KEY: z.string().optional(),
   KLIPY_API_KEY: z.string().optional(),
+  /** Web admin panel at /admin (sign-in with an ADMIN account). Set to "off" to remove it entirely. */
+  ADMIN_PANEL: z.enum(['on', 'off']).default('on'),
 });
 
 const parsed = schema.safeParse(process.env);
